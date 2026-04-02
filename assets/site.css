@@ -3,7 +3,8 @@
   --panel: rgb(227, 165, 111);
   --text: #2c2c2a;
   --muted: #6b6a64;
-  --border: #e8e6df;
+  --border: rgb(198, 132, 79);   /* warm, slightly darker than the panel */
+  --card:   rgb(255, 246, 236);  /* warm parchment */
   --link: #185fa5;
 }
 
@@ -66,7 +67,7 @@ h2 {
   border: 1px solid var(--border);
   border-radius: 14px;
   padding: 14px;
-  background: #fff;
+  background: var(--card);
   transition: transform 120ms ease, border-color 120ms ease, box-shadow 120ms ease;
 }
 
