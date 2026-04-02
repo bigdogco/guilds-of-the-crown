@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guild — Time Model</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f9f8f4;
+      margin: 0;
+      padding: 32px 16px;
+      color: #2C2C2A;
+    }
+    .page { max-width: 760px; margin: 0 auto; }
+    h1 { font-size: 22px; font-weight: 500; color: #2C2C2A; margin-bottom: 6px; }
+    .subtitle { font-size: 13px; color: #888780; margin-bottom: 48px; }
+    .section { margin-bottom: 64px; }
+    .section-label { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: #888780; text-transform: uppercase; margin-bottom: 6px; }
+    h2 { font-size: 17px; font-weight: 500; color: #2C2C2A; margin: 0 0 4px 0; }
+    .section-desc { font-size: 13px; color: #888780; margin-bottom: 20px; }
+    .diagram { background: #ffffff; border: 1px solid #e8e6df; border-radius: 12px; padding: 24px 16px; }
+    .divider { border: none; border-top: 1px solid #e8e6df; margin: 48px 0; }
+    .th       { font-size: 14px; font-weight: 500; fill: #3C3489; }
+    .ts       { font-size: 12px; font-weight: 400; fill: #534AB7; }
+    .th-teal  { font-size: 14px; font-weight: 500; fill: #085041; }
+    .ts-teal  { font-size: 12px; font-weight: 400; fill: #0F6E56; }
+    .th-amber { font-size: 14px; font-weight: 500; fill: #633806; }
+    .ts-amber { font-size: 12px; font-weight: 400; fill: #854F0B; }
+    .th-gray  { font-size: 14px; font-weight: 500; fill: #444441; }
+    .ts-gray  { font-size: 12px; font-weight: 400; fill: #5F5E5A; }
+    .th-blue  { font-size: 14px; font-weight: 500; fill: #0C447C; }
+    .ts-blue  { font-size: 12px; font-weight: 400; fill: #185FA5; }
+    .th-purple{ font-size: 14px; font-weight: 500; fill: #3C3489; }
+    .ts-purple{ font-size: 12px; font-weight: 400; fill: #534AB7; }
+    .label    { font-size: 10px; fill: #888780; letter-spacing: 0.05em; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Guild — Time Model</h1>
+  <p class="subtitle">Time unit hierarchy, fixed timestep loop, game triggers, speed control, and tick rate table</p>
+
+  <!-- ═══════════════════════════════════════════════
+       1. TIME UNIT HIERARCHY
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Structure</div>
+    <h2>Time unit hierarchy</h2>
+    <p class="section-desc">Seven nested time units from tick to year. Weeks per season and seasons per year are configurable in options. All other unit relationships are fixed.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 560" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+
+    <rect x="40" y="20" width="600" height="510" rx="16" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="60" y="48" dominant-baseline="central">Year</text>
+    <text class="ts-gray" x="60" y="66" dominant-baseline="central">Long-term progression</text>
+
+    <rect x="64" y="84" width="552" height="400" rx="14" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="84" y="110" dominant-baseline="central">Season</text>
+    <text class="ts-gray" x="84" y="128" dominant-baseline="central">Cosmetic / calendar only — configurable count per year</text>
+    <rect x="570" y="86" width="28" height="22" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="label" x="584" y="97" text-anchor="middle" dominant-baseline="central" style="fill:#534AB7">cfg</text>
+
+    <rect x="88" y="146" width="504" height="290" rx="12" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th-purple" x="108" y="170" dominant-baseline="central">Week</text>
+    <text class="ts-purple" x="108" y="188" dominant-baseline="central">Expense and tax cycle — configurable weeks per season</text>
+    <rect x="570" y="148" width="28" height="22" rx="4" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="label" x="584" y="159" text-anchor="middle" dominant-baseline="central" style="fill:#534AB7">cfg</text>
+
+    <rect x="112" y="206" width="456" height="192" rx="10" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="132" y="228" dominant-baseline="central">Day</text>
+    <text class="ts-teal" x="132" y="246" dominant-baseline="central">Main gameplay unit — wages and upkeep deducted at midnight</text>
+
+    <rect x="136" y="264" width="408" height="106" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="156" y="284" dominant-baseline="central">Hour</text>
+    <text class="ts-teal" x="156" y="302" dominant-baseline="central">Visible to player — drives NPC schedules</text>
+
+    <rect x="160" y="320" width="360" height="30" rx="6" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="180" y="335" dominant-baseline="central">Minute</text>
+    <text class="ts-teal" x="280" y="335" dominant-baseline="central">Visible to player — fine-grained clock display</text>
+
+    <rect x="160" y="358" width="360" height="30" rx="6" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="180" y="373" dominant-baseline="central">Tick</text>
+    <text class="ts-amber" x="232" y="373" dominant-baseline="central">Fixed in-game time step — fired by accumulator, not dt</text>
+
+    <text class="label" x="536" y="335" text-anchor="middle">fixed</text>
+    <text class="label" x="536" y="373" text-anchor="middle">fixed</text>
+    </svg>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       2. FIXED TIMESTEP LOOP
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Implementation</div>
+    <h2>Fixed timestep accumulator</h2>
+    <p class="section-desc">A tick is not the same as dt. The game loop receives variable dt each frame and uses an accumulator to fire a consistent number of fixed-size game ticks. Speed control changes tickDuration — not the loop rate.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 440" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+
+    <rect x="40" y="20" width="600" height="100" rx="14" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="60" y="48" dominant-baseline="central">Real-time game loop</text>
+    <text class="ts-gray" x="60" y="68" dominant-baseline="central">Fires every frame — receives dt (variable, depends on frame rate)</text>
+    <text class="ts-gray" x="60" y="88" dominant-baseline="central">Accumulates real time — decides how many fixed ticks to advance this frame</text>
+
+    <line x1="340" y1="120" x2="340" y2="160" stroke="#444441" stroke-width="1" marker-end="url(#a2)"/>
+
+    <rect x="40" y="160" width="600" height="100" rx="14" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="60" y="188" dominant-baseline="central">Fixed timestep accumulator</text>
+    <text class="ts-amber" x="60" y="208" dominant-baseline="central">accumulator += dt</text>
+    <text class="ts-amber" x="60" y="228" dominant-baseline="central">while accumulator &gt;= tickDuration: advance one tick,  accumulator -= tickDuration</text>
+
+    <line x1="340" y1="260" x2="340" y2="300" stroke="#444441" stroke-width="1" marker-end="url(#a2)"/>
+
+    <rect x="40" y="300" width="600" height="100" rx="14" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="60" y="328" dominant-baseline="central">Game tick fires</text>
+    <text class="ts-teal" x="60" y="348" dominant-baseline="central">Fixed in-game time unit — always the same size regardless of frame rate</text>
+    <text class="ts-teal" x="60" y="368" dominant-baseline="central">Speed control changes tickDuration — shorter = more ticks per second = faster game</text>
+
+    <rect x="40" y="418" width="130" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+    <text class="th-blue" x="105" y="434" text-anchor="middle" dominant-baseline="central">Paused</text>
+    <text class="ts-blue" x="105" y="452" text-anchor="middle" dominant-baseline="central">accumulator frozen</text>
+
+    <rect x="190" y="418" width="130" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="255" y="434" text-anchor="middle" dominant-baseline="central">Slow</text>
+    <text class="ts-teal" x="255" y="452" text-anchor="middle" dominant-baseline="central">long tickDuration</text>
+
+    <rect x="340" y="418" width="130" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="405" y="434" text-anchor="middle" dominant-baseline="central">Normal</text>
+    <text class="ts-teal" x="405" y="452" text-anchor="middle" dominant-baseline="central">default tickDuration</text>
+
+    <rect x="490" y="418" width="150" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="565" y="434" text-anchor="middle" dominant-baseline="central">Fast</text>
+    <text class="ts-amber" x="565" y="452" text-anchor="middle" dominant-baseline="central">short tickDuration</text>
+
+    <path d="M340 400 L105 418" fill="none" stroke="#444441" stroke-width="1" opacity="0.3" marker-end="url(#a2)"/>
+    <path d="M340 400 L255 418" fill="none" stroke="#444441" stroke-width="1" opacity="0.3" marker-end="url(#a2)"/>
+    <path d="M340 400 L405 418" fill="none" stroke="#444441" stroke-width="1" opacity="0.3" marker-end="url(#a2)"/>
+    <path d="M340 400 L565 418" fill="none" stroke="#444441" stroke-width="1" opacity="0.3" marker-end="url(#a2)"/>
+    </svg>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       3. WHAT EACH UNIT TRIGGERS
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Triggers</div>
+    <h2>What each time unit triggers</h2>
+    <p class="section-desc">Each time unit fires a distinct set of game events. Ticks drive everything continuously. Days and weeks are the main financial settlement points.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 500" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+
+    <rect x="40" y="30" width="100" height="44" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="90" y="52" text-anchor="middle" dominant-baseline="central">Tick</text>
+    <line x1="140" y1="52" x2="200" y2="52" stroke="#444441" stroke-width="1" marker-end="url(#a3)"/>
+    <rect x="200" y="20" width="420" height="64" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="410" y="40" text-anchor="middle" dominant-baseline="central">All game logic</text>
+    <text class="ts-gray" x="410" y="60" text-anchor="middle" dominant-baseline="central">NPC movement, crafting progress, market transactions</text>
+
+    <rect x="40" y="114" width="100" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="90" y="136" text-anchor="middle" dominant-baseline="central">Minute</text>
+    <line x1="140" y1="136" x2="200" y2="136" stroke="#444441" stroke-width="1" marker-end="url(#a3)"/>
+    <rect x="200" y="104" width="420" height="64" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="410" y="124" text-anchor="middle" dominant-baseline="central">Clock display updates</text>
+    <text class="ts-gray" x="410" y="144" text-anchor="middle" dominant-baseline="central">Fine-grained time shown to player</text>
+
+    <rect x="40" y="198" width="100" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="90" y="220" text-anchor="middle" dominant-baseline="central">Hour</text>
+    <line x1="140" y1="220" x2="200" y2="220" stroke="#444441" stroke-width="1" marker-end="url(#a3)"/>
+    <rect x="200" y="188" width="420" height="64" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="410" y="208" text-anchor="middle" dominant-baseline="central">NPC schedule events</text>
+    <text class="ts-gray" x="410" y="228" text-anchor="middle" dominant-baseline="central">Shops open or close, NPCs travel home</text>
+
+    <rect x="40" y="282" width="100" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th-purple" x="90" y="304" text-anchor="middle" dominant-baseline="central">Day</text>
+    <line x1="140" y1="304" x2="200" y2="304" stroke="#444441" stroke-width="1" marker-end="url(#a3)"/>
+    <rect x="200" y="272" width="420" height="64" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="410" y="292" text-anchor="middle" dominant-baseline="central">End of day settlement</text>
+    <text class="ts-gray" x="410" y="312" text-anchor="middle" dominant-baseline="central">Wages, building upkeep deducted at midnight</text>
+
+    <rect x="40" y="366" width="100" height="44" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th-purple" x="90" y="388" text-anchor="middle" dominant-baseline="central">Week</text>
+    <line x1="140" y1="388" x2="200" y2="388" stroke="#444441" stroke-width="1" marker-end="url(#a3)"/>
+    <rect x="200" y="356" width="420" height="64" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="410" y="376" text-anchor="middle" dominant-baseline="central">End of week settlement</text>
+    <text class="ts-gray" x="410" y="396" text-anchor="middle" dominant-baseline="central">City taxes deducted, loan repayment instalment</text>
+
+    <rect x="40" y="450" width="100" height="36" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="90" y="468" text-anchor="middle" dominant-baseline="central">Season / Year</text>
+    <line x1="140" y1="468" x2="200" y2="468" stroke="#444441" stroke-width="1" marker-end="url(#a3)"/>
+    <rect x="200" y="440" width="420" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="410" y="458" text-anchor="middle" dominant-baseline="central">Calendar label update only</text>
+    <text class="ts-gray" x="410" y="474" text-anchor="middle" dominant-baseline="central">Cosmetic — no economic effect</text>
+    </svg>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       4. TICK RATE TABLE
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Timing</div>
+    <h2>Tick rates and real-time durations</h2>
+    <p class="section-desc">Based on 1 in-game day = 10 real minutes at normal speed. Fast speed is 4x normal. Slow speed is 0.25x normal. All values derive from 60 ticks per in-game minute.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 580" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+
+    <rect x="40" y="20" width="600" height="180" rx="14" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="60" y="48" dominant-baseline="central">Fixed unit relationships</text>
+    <text class="ts-gray" x="60" y="68" dominant-baseline="central">These never change regardless of speed or config</text>
+
+    <rect x="64" y="84" width="130" height="100" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="129" y="112" text-anchor="middle" dominant-baseline="central">1 minute</text>
+    <text class="ts-teal" x="129" y="132" text-anchor="middle" dominant-baseline="central">= 60 ticks</text>
+    <text class="ts-teal" x="129" y="152" text-anchor="middle" dominant-baseline="central">= 0.42s real</text>
+    <text class="ts-teal" x="129" y="170" text-anchor="middle" dominant-baseline="central">at normal</text>
+
+    <rect x="214" y="84" width="130" height="100" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="279" y="112" text-anchor="middle" dominant-baseline="central">1 hour</text>
+    <text class="ts-teal" x="279" y="132" text-anchor="middle" dominant-baseline="central">= 60 minutes</text>
+    <text class="ts-teal" x="279" y="152" text-anchor="middle" dominant-baseline="central">= 25s real</text>
+    <text class="ts-teal" x="279" y="170" text-anchor="middle" dominant-baseline="central">at normal</text>
+
+    <rect x="364" y="84" width="130" height="100" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="429" y="112" text-anchor="middle" dominant-baseline="central">1 day</text>
+    <text class="ts-teal" x="429" y="132" text-anchor="middle" dominant-baseline="central">= 24 hours</text>
+    <text class="ts-teal" x="429" y="152" text-anchor="middle" dominant-baseline="central">= 10 min real</text>
+    <text class="ts-teal" x="429" y="170" text-anchor="middle" dominant-baseline="central">at normal</text>
+
+    <rect x="514" y="84" width="110" height="100" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="569" y="112" text-anchor="middle" dominant-baseline="central">1 week</text>
+    <text class="ts-teal" x="569" y="132" text-anchor="middle" dominant-baseline="central">= 7 days</text>
+    <text class="ts-teal" x="569" y="152" text-anchor="middle" dominant-baseline="central">= 70 min real</text>
+    <text class="ts-teal" x="569" y="170" text-anchor="middle" dominant-baseline="central">at normal</text>
+
+    <rect x="40" y="230" width="600" height="200" rx="14" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th-purple" x="60" y="258" dominant-baseline="central">Tick rates by speed</text>
+    <text class="ts-purple" x="60" y="278" dominant-baseline="central">Ticks per real-time second at each speed setting</text>
+
+    <rect x="64" y="294" width="120" height="116" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+    <text class="th-blue" x="124" y="322" text-anchor="middle" dominant-baseline="central">Paused</text>
+    <text class="ts-blue" x="124" y="342" text-anchor="middle" dominant-baseline="central">0 ticks/sec</text>
+    <text class="ts-blue" x="124" y="362" text-anchor="middle" dominant-baseline="central">Game frozen</text>
+    <text class="ts-blue" x="124" y="382" text-anchor="middle" dominant-baseline="central">—</text>
+    <text class="ts-blue" x="124" y="400" text-anchor="middle" dominant-baseline="central">—</text>
+
+    <rect x="204" y="294" width="120" height="116" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="264" y="322" text-anchor="middle" dominant-baseline="central">Slow</text>
+    <text class="ts-teal" x="264" y="342" text-anchor="middle" dominant-baseline="central">36 ticks/sec</text>
+    <text class="ts-teal" x="264" y="362" text-anchor="middle" dominant-baseline="central">0.25x normal</text>
+    <text class="ts-teal" x="264" y="382" text-anchor="middle" dominant-baseline="central">1 day = 40 min</text>
+    <text class="ts-teal" x="264" y="400" text-anchor="middle" dominant-baseline="central">real time</text>
+
+    <rect x="344" y="294" width="120" height="116" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="404" y="322" text-anchor="middle" dominant-baseline="central">Normal</text>
+    <text class="ts-teal" x="404" y="342" text-anchor="middle" dominant-baseline="central">144 ticks/sec</text>
+    <text class="ts-teal" x="404" y="362" text-anchor="middle" dominant-baseline="central">1x baseline</text>
+    <text class="ts-teal" x="404" y="382" text-anchor="middle" dominant-baseline="central">1 day = 10 min</text>
+    <text class="ts-teal" x="404" y="400" text-anchor="middle" dominant-baseline="central">real time</text>
+
+    <rect x="484" y="294" width="130" height="116" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="549" y="322" text-anchor="middle" dominant-baseline="central">Fast</text>
+    <text class="ts-amber" x="549" y="342" text-anchor="middle" dominant-baseline="central">576 ticks/sec</text>
+    <text class="ts-amber" x="549" y="362" text-anchor="middle" dominant-baseline="central">4x normal</text>
+    <text class="ts-amber" x="549" y="382" text-anchor="middle" dominant-baseline="central">1 day = 2.5 min</text>
+    <text class="ts-amber" x="549" y="400" text-anchor="middle" dominant-baseline="central">real time</text>
+
+    <rect x="40" y="456" width="600" height="100" rx="14" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="60" y="482" dominant-baseline="central">Full derivation at normal speed</text>
+    <text class="ts-gray" x="60" y="502" dominant-baseline="central">60 ticks/min  x  60 min/hr  x  24 hr/day  =  86,400 ticks per in-game day</text>
+    <text class="ts-gray" x="60" y="522" dominant-baseline="central">86,400 ticks  /  600 real seconds  =  144 ticks per real second at normal speed</text>
+    <text class="ts-gray" x="60" y="542" dominant-baseline="central">Slow = 144 x 0.25 = 36     Fast = 144 x 4 = 576</text>
+    </svg>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       5. SPEED CONTROL
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Speed control</div>
+    <h2>Player speed control</h2>
+    <p class="section-desc">4 speed settings — pause, slow, normal, fast. All simulation logic scales with tick rate. Player UI and notifications are always responsive regardless of speed.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 300" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a5" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+
+    <rect x="40" y="20" width="600" height="60" rx="12" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="60" y="44" dominant-baseline="central">Game speed — player controlled</text>
+    <text class="ts-gray" x="60" y="62" dominant-baseline="central">Changes tickDuration in the accumulator — all game logic scales automatically</text>
+
+    <path d="M340 80 L98 120" fill="none" stroke="#444441" stroke-width="1" opacity="0.3" marker-end="url(#a5)"/>
+    <path d="M340 80 L234 120" fill="none" stroke="#444441" stroke-width="1" opacity="0.3" marker-end="url(#a5)"/>
+    <path d="M340 80 L370 120" fill="none" stroke="#444441" stroke-width="1" opacity="0.3" marker-end="url(#a5)"/>
+    <path d="M340 80 L506 120" fill="none" stroke="#444441" stroke-width="1" opacity="0.3" marker-end="url(#a5)"/>
+
+    <rect x="40" y="120" width="116" height="70" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+    <text class="th-blue" x="98" y="145" text-anchor="middle" dominant-baseline="central">Paused</text>
+    <text class="ts-blue" x="98" y="163" text-anchor="middle" dominant-baseline="central">0 ticks/sec</text>
+    <text class="ts-blue" x="98" y="179" text-anchor="middle" dominant-baseline="central">Game frozen</text>
+
+    <rect x="176" y="120" width="116" height="70" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="234" y="145" text-anchor="middle" dominant-baseline="central">Slow</text>
+    <text class="ts-teal" x="234" y="163" text-anchor="middle" dominant-baseline="central">36 ticks/sec</text>
+    <text class="ts-teal" x="234" y="179" text-anchor="middle" dominant-baseline="central">1 day = 40 min</text>
+
+    <rect x="312" y="120" width="116" height="70" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="370" y="145" text-anchor="middle" dominant-baseline="central">Normal</text>
+    <text class="ts-teal" x="370" y="163" text-anchor="middle" dominant-baseline="central">144 ticks/sec</text>
+    <text class="ts-teal" x="370" y="179" text-anchor="middle" dominant-baseline="central">1 day = 10 min</text>
+
+    <rect x="448" y="120" width="130" height="70" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="513" y="145" text-anchor="middle" dominant-baseline="central">Fast</text>
+    <text class="ts-amber" x="513" y="163" text-anchor="middle" dominant-baseline="central">576 ticks/sec</text>
+    <text class="ts-amber" x="513" y="179" text-anchor="middle" dominant-baseline="central">1 day = 2.5 min</text>
+
+    <rect x="40" y="214" width="600" height="44" rx="12" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="60" y="232" dominant-baseline="central">Scales with speed</text>
+    <text class="ts-teal" x="60" y="250" dominant-baseline="central">Crafting timers, NPC movement, market transactions, construction countdown</text>
+
+    <rect x="40" y="266" width="600" height="24" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="ts-purple" x="60" y="278" dominant-baseline="central">Does not scale:  player UI, notifications and alerts — always responsive</text>
+    </svg>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       6. CONFIG OPTIONS
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Design decisions</div>
+    <h2>Configurable options</h2>
+    <p class="section-desc">Only two values are exposed in game options to keep the settings screen simple.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 130" xmlns="http://www.w3.org/2000/svg">
+    <rect x="40" y="20" width="280" height="90" rx="12" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th-purple" x="180" y="50" text-anchor="middle" dominant-baseline="central">Weeks per season</text>
+    <text class="ts-purple" x="180" y="72" text-anchor="middle" dominant-baseline="central">Default: 4 weeks</text>
+    <text class="ts-purple" x="180" y="92" text-anchor="middle" dominant-baseline="central">Controls how long each season feels</text>
+
+    <rect x="360" y="20" width="280" height="90" rx="12" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th-purple" x="500" y="50" text-anchor="middle" dominant-baseline="central">Seasons per year</text>
+    <text class="ts-purple" x="500" y="72" text-anchor="middle" dominant-baseline="central">Default: 4 seasons</text>
+    <text class="ts-purple" x="500" y="92" text-anchor="middle" dominant-baseline="central">Controls how fast a year passes</text>
+    </svg>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

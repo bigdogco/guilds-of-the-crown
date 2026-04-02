@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guild Economic Loop — Detailed Diagrams</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f9f8f4;
+      margin: 0;
+      padding: 32px 16px;
+      color: #2C2C2A;
+    }
+    .page {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 22px;
+      font-weight: 500;
+      color: #2C2C2A;
+      margin-bottom: 6px;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #888780;
+      margin-bottom: 48px;
+    }
+    .section {
+      margin-bottom: 64px;
+    }
+    .section-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      color: #888780;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    h2 {
+      font-size: 17px;
+      font-weight: 500;
+      color: #2C2C2A;
+      margin: 0 0 4px 0;
+    }
+    .section-desc {
+      font-size: 13px;
+      color: #888780;
+      margin-bottom: 20px;
+    }
+    .diagram {
+      background: #ffffff;
+      border: 1px solid #e8e6df;
+      border-radius: 12px;
+      padding: 24px 16px;
+    }
+    .divider {
+      border: none;
+      border-top: 1px solid #e8e6df;
+      margin: 48px 0;
+    }
+    .th      { font-size: 14px; font-weight: 500; fill: #3C3489; }
+    .ts      { font-size: 12px; font-weight: 400; fill: #534AB7; }
+    .th-teal { font-size: 14px; font-weight: 500; fill: #085041; }
+    .ts-teal { font-size: 12px; font-weight: 400; fill: #0F6E56; }
+    .th-amber{ font-size: 14px; font-weight: 500; fill: #633806; }
+    .ts-amber{ font-size: 12px; font-weight: 400; fill: #854F0B; }
+    .th-coral{ font-size: 14px; font-weight: 500; fill: #712B13; }
+    .ts-coral{ font-size: 12px; font-weight: 400; fill: #993C1D; }
+    .th-gray { font-size: 14px; font-weight: 500; fill: #444441; }
+    .th-green{ font-size: 14px; font-weight: 500; fill: #27500A; }
+    .ts-green{ font-size: 12px; font-weight: 400; fill: #3B6D11; }
+    .th-blue { font-size: 14px; font-weight: 500; fill: #0C447C; }
+    .ts-blue { font-size: 12px; font-weight: 400; fill: #185FA5; }
+    .th-red  { font-size: 14px; font-weight: 500; fill: #791F1F; }
+    .ts-red  { font-size: 12px; font-weight: 400; fill: #A32D2D; }
+    .label   { font-size: 10px; fill: #888780; letter-spacing: 0.05em; }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <h1>Guild — Detailed Economic Diagrams</h1>
+  <p class="subtitle">Expanded design decisions for each phase of the economic loop</p>
+
+  <!-- ═══════════════════════════════════════════════
+       1. RESOURCE GATHERING
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Production</div>
+    <h2>Resource gathering — sources</h2>
+    <p class="section-desc">Resources enter the business from two distinct origins: owned extraction buildings or open natural gathering spots in the world.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 500" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <rect x="40" y="20" width="270" height="280" rx="14" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="60" y="48" dominant-baseline="central">Extraction buildings</text>
+    <text class="ts-teal" x="60" y="66" dominant-baseline="central">Owned, fixed location</text>
+    <rect x="64" y="84" width="220" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="174" y="106" text-anchor="middle" dominant-baseline="central">Mine / quarry</text>
+    <text class="ts-teal" x="174" y="124" text-anchor="middle" dominant-baseline="central">Iron, stone, coal, gems</text>
+    <rect x="64" y="160" width="220" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="174" y="182" text-anchor="middle" dominant-baseline="central">Sawmill / farm</text>
+    <text class="ts-teal" x="174" y="200" text-anchor="middle" dominant-baseline="central">Timber, grain, flax</text>
+    <rect x="64" y="236" width="220" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="174" y="258" text-anchor="middle" dominant-baseline="central">Hunting lodge / fishery</text>
+
+    <rect x="370" y="20" width="270" height="280" rx="14" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="390" y="48" dominant-baseline="central">Natural gathering spots</text>
+    <text class="ts-green" x="390" y="66" dominant-baseline="central">Open world, shared, deplete</text>
+    <rect x="394" y="84" width="220" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="504" y="106" text-anchor="middle" dominant-baseline="central">Meadow / forest</text>
+    <text class="ts-green" x="504" y="124" text-anchor="middle" dominant-baseline="central">Herbs, berries, mushrooms</text>
+    <rect x="394" y="160" width="220" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="504" y="182" text-anchor="middle" dominant-baseline="central">Pond / river</text>
+    <text class="ts-green" x="504" y="200" text-anchor="middle" dominant-baseline="central">Fish, reeds, clay</text>
+    <rect x="394" y="236" width="220" height="44" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="504" y="258" text-anchor="middle" dominant-baseline="central">Wild animals</text>
+
+    <rect x="220" y="400" width="240" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th" x="340" y="422" text-anchor="middle" dominant-baseline="central">Workshop inventory</text>
+    <text class="ts" x="340" y="440" text-anchor="middle" dominant-baseline="central">Ready for crafting</text>
+
+    <path d="M175 300 L290 400" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a1)"/>
+    <path d="M504 300 L390 400" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a1)"/>
+    <text class="label" x="175" y="356" text-anchor="middle">owned output</text>
+    <text class="label" x="504" y="356" text-anchor="middle">player / worker gathers</text>
+    </svg>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       2. RESOURCE OUTPUT PATHS
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Production</div>
+    <h2>Resource gathering — output paths</h2>
+    <p class="section-desc">Extraction building output flows to the market automatically, or the player can buy directly from the building. Natural spots flow straight to the workshop.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 580" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <rect x="40" y="20" width="260" height="240" rx="14" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="60" y="48" dominant-baseline="central">Extraction buildings</text>
+    <text class="ts-teal" x="60" y="66" dominant-baseline="central">Owned, fixed location</text>
+    <rect x="60" y="80" width="220" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="170" y="102" text-anchor="middle" dominant-baseline="central">Mine / quarry</text>
+    <rect x="60" y="144" width="220" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="170" y="166" text-anchor="middle" dominant-baseline="central">Sawmill / farm</text>
+    <rect x="60" y="208" width="220" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="170" y="230" text-anchor="middle" dominant-baseline="central">Hunting lodge / fishery</text>
+
+    <rect x="380" y="20" width="260" height="240" rx="14" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="400" y="48" dominant-baseline="central">Natural gathering spots</text>
+    <text class="ts-green" x="400" y="66" dominant-baseline="central">Open world, shared, deplete</text>
+    <rect x="400" y="80" width="220" height="44" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="510" y="102" text-anchor="middle" dominant-baseline="central">Meadow / forest</text>
+    <rect x="400" y="144" width="220" height="44" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="510" y="166" text-anchor="middle" dominant-baseline="central">Pond / river</text>
+    <rect x="400" y="208" width="220" height="44" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="510" y="230" text-anchor="middle" dominant-baseline="central">Wild animals</text>
+
+    <rect x="220" y="340" width="180" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="310" y="362" text-anchor="middle" dominant-baseline="central">Market</text>
+    <text class="ts-amber" x="310" y="380" text-anchor="middle" dominant-baseline="central">Price set by supply &amp; demand</text>
+
+    <rect x="220" y="480" width="240" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th" x="340" y="502" text-anchor="middle" dominant-baseline="central">Workshop inventory</text>
+    <text class="ts" x="340" y="520" text-anchor="middle" dominant-baseline="central">Ready for crafting</text>
+
+    <path d="M170 260 L170 310 L222 350" fill="none" stroke="#1D9E75" stroke-width="1" opacity="0.5" marker-end="url(#a2)"/>
+    <path d="M170 310 L280 480" fill="none" stroke="#534AB7" stroke-width="1" stroke-dasharray="5 3" opacity="0.5" marker-end="url(#a2)"/>
+    <path d="M510 260 L510 430 L460 480" fill="none" stroke="#3B6D11" stroke-width="1" opacity="0.5" marker-end="url(#a2)"/>
+    <path d="M310 396 L310 480" fill="none" stroke="#BA7517" stroke-width="1" opacity="0.5" marker-end="url(#a2)"/>
+    <text class="label" x="108" y="326" text-anchor="middle">to market</text>
+    <text class="label" x="196" y="408" text-anchor="middle">direct buy</text>
+    <text class="label" x="540" y="390" text-anchor="middle">player gathers</text>
+    </svg>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       3. CITY AI EMERGENCY IMPORT
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Trade</div>
+    <h2>City AI emergency import</h2>
+    <p class="section-desc">If a resource stays critically low on the market for too long, the city AI triggers an emergency import from other towns — maintaining a stock floor.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 600" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a3" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <rect x="40" y="40" width="180" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="130" y="62" text-anchor="middle" dominant-baseline="central">Extraction buildings</text>
+    <text class="ts-teal" x="130" y="80" text-anchor="middle" dominant-baseline="central">Mine, sawmill, farm…</text>
+    <rect x="40" y="140" width="180" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="130" y="162" text-anchor="middle" dominant-baseline="central">Natural spots</text>
+    <text class="ts-green" x="130" y="180" text-anchor="middle" dominant-baseline="central">Meadow, pond, forest…</text>
+    <rect x="260" y="90" width="200" height="70" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="360" y="116" text-anchor="middle" dominant-baseline="central">Market</text>
+    <text class="ts-amber" x="360" y="136" text-anchor="middle" dominant-baseline="central">Tracks stock per resource</text>
+    <text class="ts-amber" x="360" y="152" text-anchor="middle" dominant-baseline="central">Price rises when low</text>
+    <path d="M220 68 L260 118" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a3)"/>
+    <path d="M220 168 L260 142" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a3)"/>
+    <rect x="260" y="240" width="200" height="56" rx="8" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.5"/>
+    <text class="th-red" x="360" y="262" text-anchor="middle" dominant-baseline="central">Stock critically low</text>
+    <text class="ts-red" x="360" y="280" text-anchor="middle" dominant-baseline="central">Below threshold for N days</text>
+    <line x1="360" y1="160" x2="360" y2="240" stroke="#E24B4A" stroke-width="1" stroke-dasharray="5 3" marker-end="url(#a3)"/>
+    <rect x="260" y="360" width="200" height="70" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="360" y="386" text-anchor="middle" dominant-baseline="central">City AI triggers import</text>
+    <text class="ts-teal" x="360" y="404" text-anchor="middle" dominant-baseline="central">Buys from other towns</text>
+    <text class="ts-teal" x="360" y="420" text-anchor="middle" dominant-baseline="central">Small qty, higher price</text>
+    <line x1="360" y1="296" x2="360" y2="360" stroke="#444441" stroke-width="1" marker-end="url(#a3)"/>
+    <rect x="260" y="500" width="200" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="360" y="522" text-anchor="middle" dominant-baseline="central">Emergency stock listed</text>
+    <text class="ts-amber" x="360" y="540" text-anchor="middle" dominant-baseline="central">Market floor maintained</text>
+    <line x1="360" y1="430" x2="360" y2="500" stroke="#444441" stroke-width="1" marker-end="url(#a3)"/>
+    <rect x="520" y="360" width="130" height="70" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="585" y="386" text-anchor="middle" dominant-baseline="central">Other towns</text>
+    <text class="ts-teal" x="585" y="404" text-anchor="middle" dominant-baseline="central">External supply</text>
+    <text class="ts-teal" x="585" y="420" text-anchor="middle" dominant-baseline="central">Abstract source</text>
+    <path d="M520 395 L460 395" fill="none" stroke="#444441" stroke-width="1" stroke-dasharray="5 3" opacity="0.5" marker-end="url(#a3)"/>
+    </svg>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       4. HIRING EMPLOYEES
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Production</div>
+    <h2>Hiring employees</h2>
+    <p class="section-desc">NPCs are hired from a finite town pool. Skill grows through work, triggering wage rise requests. No grudges — NPCs rehire to anyone offering acceptable wages.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 740" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a4" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <rect x="40" y="20" width="600" height="120" rx="14" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="60" y="48" dominant-baseline="central">Town NPC pool</text>
+    <text class="ts-teal" x="60" y="68" dominant-baseline="central">Finite — grows when town prospers and demand for work is high</text>
+    <rect x="60" y="80" width="180" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="150" y="102" text-anchor="middle" dominant-baseline="central">Existing NPCs</text>
+    <rect x="260" y="80" width="200" height="44" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="360" y="96" text-anchor="middle" dominant-baseline="central">New arrivals</text>
+    <text class="ts-green" x="360" y="114" text-anchor="middle" dominant-baseline="central">Town wealth + job demand</text>
+    <rect x="480" y="80" width="140" height="44" rx="8" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.5"/>
+    <text class="th-red" x="550" y="96" text-anchor="middle" dominant-baseline="central">NPCs leave</text>
+    <text class="ts-red" x="550" y="114" text-anchor="middle" dominant-baseline="central">No work, poor town</text>
+    <line x1="340" y1="140" x2="340" y2="184" stroke="#444441" stroke-width="1" marker-end="url(#a4)"/>
+    <rect x="220" y="184" width="240" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th" x="340" y="206" text-anchor="middle" dominant-baseline="central">Player hires NPC</text>
+    <text class="ts" x="340" y="224" text-anchor="middle" dominant-baseline="central">Up to business headcount limit</text>
+    <line x1="340" y1="240" x2="340" y2="284" stroke="#444441" stroke-width="1" marker-end="url(#a4)"/>
+    <rect x="220" y="284" width="240" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="340" y="306" text-anchor="middle" dominant-baseline="central">Assigned to task</text>
+    <text class="ts-teal" x="340" y="324" text-anchor="middle" dominant-baseline="central">Gather, craft, or sell</text>
+    <line x1="340" y1="340" x2="340" y2="384" stroke="#444441" stroke-width="1" marker-end="url(#a4)"/>
+    <rect x="220" y="384" width="240" height="70" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="340" y="406" text-anchor="middle" dominant-baseline="central">Works — gains skill XP</text>
+    <text class="ts-teal" x="340" y="424" text-anchor="middle" dominant-baseline="central">Higher skill = faster output</text>
+    <text class="ts-teal" x="340" y="442" text-anchor="middle" dominant-baseline="central">Skill grows through doing</text>
+    <line x1="340" y1="454" x2="340" y2="498" stroke="#444441" stroke-width="1" marker-end="url(#a4)"/>
+    <rect x="220" y="498" width="240" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="340" y="520" text-anchor="middle" dominant-baseline="central">Requests wage rise</text>
+    <text class="ts-amber" x="340" y="538" text-anchor="middle" dominant-baseline="central">Triggered at skill threshold</text>
+    <path d="M280 554 L160 598" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a4)"/>
+    <path d="M400 554 L520 598" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a4)"/>
+    <rect x="60" y="598" width="200" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="160" y="620" text-anchor="middle" dominant-baseline="central">Player accepts</text>
+    <text class="ts-green" x="160" y="638" text-anchor="middle" dominant-baseline="central">Higher wage, keeps working</text>
+    <rect x="420" y="598" width="200" height="56" rx="8" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.5"/>
+    <text class="th-red" x="520" y="620" text-anchor="middle" dominant-baseline="central">Player rejects</text>
+    <text class="ts-red" x="520" y="638" text-anchor="middle" dominant-baseline="central">NPC quits, returns to pool</text>
+    <rect x="420" y="684" width="200" height="44" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="520" y="700" text-anchor="middle" dominant-baseline="central">Returns to town pool</text>
+    <text class="ts-teal" x="520" y="716" text-anchor="middle" dominant-baseline="central">Skill retained, hireable again</text>
+    <line x1="520" y1="654" x2="520" y2="684" stroke="#444441" stroke-width="1" marker-end="url(#a4)"/>
+    </svg>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       5. CRAFTING SYSTEM
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Production</div>
+    <h2>Crafting system</h2>
+    <p class="section-desc">Fixed recipes per trade. Crafting always succeeds if ingredients are present. Worker skill reduces time. Small random chance of bonus output.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 700" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a5" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <rect x="220" y="30" width="240" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th" x="340" y="52" text-anchor="middle" dominant-baseline="central">Fixed recipe per trade</text>
+    <text class="ts" x="340" y="70" text-anchor="middle" dominant-baseline="central">Blacksmith makes swords, baker bread…</text>
+    <line x1="340" y1="86" x2="340" y2="130" stroke="#444441" stroke-width="1" marker-end="url(#a5)"/>
+    <rect x="220" y="130" width="240" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="340" y="152" text-anchor="middle" dominant-baseline="central">Check ingredients</text>
+    <text class="ts-teal" x="340" y="170" text-anchor="middle" dominant-baseline="central">All required resources present?</text>
+    <path d="M280 186 L160 240" fill="none" stroke="#444441" stroke-width="1" opacity="0.5" marker-end="url(#a5)"/>
+    <path d="M400 186 L520 240" fill="none" stroke="#444441" stroke-width="1" opacity="0.5" marker-end="url(#a5)"/>
+    <rect x="60" y="240" width="200" height="56" rx="8" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.5"/>
+    <text class="th-red" x="160" y="262" text-anchor="middle" dominant-baseline="central">Ingredients missing</text>
+    <text class="ts-red" x="160" y="280" text-anchor="middle" dominant-baseline="central">Crafting blocked — worker idles</text>
+    <rect x="420" y="240" width="200" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="520" y="262" text-anchor="middle" dominant-baseline="central">All ingredients present</text>
+    <text class="ts-green" x="520" y="280" text-anchor="middle" dominant-baseline="central">Crafting begins</text>
+    <line x1="520" y1="296" x2="520" y2="350" stroke="#444441" stroke-width="1" marker-end="url(#a5)"/>
+    <rect x="380" y="350" width="240" height="70" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="500" y="372" text-anchor="middle" dominant-baseline="central">Crafting in progress</text>
+    <text class="ts-teal" x="500" y="392" text-anchor="middle" dominant-baseline="central">Duration set by recipe</text>
+    <text class="ts-teal" x="500" y="410" text-anchor="middle" dominant-baseline="central">Worker skill reduces time</text>
+    <line x1="500" y1="420" x2="500" y2="464" stroke="#444441" stroke-width="1" marker-end="url(#a5)"/>
+    <rect x="380" y="464" width="240" height="56" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="500" y="486" text-anchor="middle" dominant-baseline="central">Bonus output roll</text>
+    <text class="ts-teal" x="500" y="504" text-anchor="middle" dominant-baseline="central">Small chance of extra goods</text>
+    <path d="M440 520 L340 574" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a5)"/>
+    <path d="M560 520 L580 574" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a5)"/>
+    <rect x="200" y="574" width="200" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th" x="300" y="596" text-anchor="middle" dominant-baseline="central">Standard output</text>
+    <text class="ts" x="300" y="614" text-anchor="middle" dominant-baseline="central">Goes to inventory</text>
+    <rect x="480" y="574" width="160" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="560" y="596" text-anchor="middle" dominant-baseline="central">Bonus output</text>
+    <text class="ts-green" x="560" y="614" text-anchor="middle" dominant-baseline="central">Extra goods, same item</text>
+    </svg>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       6. CITY MARKET & SELLING
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Trade</div>
+    <h2>City market &amp; selling</h2>
+    <p class="section-desc">All businesses deposit into the shared city market pool. Price is always automatic — supply and demand driven. NPCs, players, and the city AI all buy from the same pool.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 660" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a6" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <rect x="60" y="30" width="180" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th" x="150" y="52" text-anchor="middle" dominant-baseline="central">Player business</text>
+    <text class="ts" x="150" y="70" text-anchor="middle" dominant-baseline="central">Deposits goods to market</text>
+    <rect x="440" y="30" width="180" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="530" y="52" text-anchor="middle" dominant-baseline="central">NPC business</text>
+    <text class="ts-teal" x="530" y="70" text-anchor="middle" dominant-baseline="central">Deposits goods to market</text>
+    <rect x="260" y="30" width="160" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="340" y="52" text-anchor="middle" dominant-baseline="central">City AI import</text>
+    <text class="ts-green" x="340" y="70" text-anchor="middle" dominant-baseline="central">Emergency stock only</text>
+    <path d="M150 86 L280 150" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a6)"/>
+    <path d="M340 86 L340 150" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a6)"/>
+    <path d="M530 86 L400 150" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a6)"/>
+    <rect x="160" y="150" width="360" height="100" rx="12" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="340" y="178" text-anchor="middle" dominant-baseline="central">City market pool</text>
+    <text class="ts-amber" x="340" y="198" text-anchor="middle" dominant-baseline="central">Price always auto — supply &amp; demand</text>
+    <text class="ts-amber" x="340" y="216" text-anchor="middle" dominant-baseline="central">High stock = low price, low stock = high price</text>
+    <text class="ts-amber" x="340" y="234" text-anchor="middle" dominant-baseline="central">Updates in real time on every transaction</text>
+    <path d="M260 250 L160 314" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a6)"/>
+    <path d="M340 250 L340 314" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a6)"/>
+    <path d="M420 250 L520 314" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a6)"/>
+    <rect x="60" y="314" width="180" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="150" y="336" text-anchor="middle" dominant-baseline="central">NPC townspeople</text>
+    <text class="ts-teal" x="150" y="354" text-anchor="middle" dominant-baseline="central">Buy based on personal need</text>
+    <rect x="260" y="314" width="160" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th" x="340" y="336" text-anchor="middle" dominant-baseline="central">Player</text>
+    <text class="ts" x="340" y="354" text-anchor="middle" dominant-baseline="central">Buys at current price</text>
+    <rect x="440" y="314" width="180" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="530" y="336" text-anchor="middle" dominant-baseline="central">City AI</text>
+    <text class="ts-green" x="530" y="354" text-anchor="middle" dominant-baseline="central">Procurement + emergency</text>
+    <path d="M150 370 L260 434" fill="none" stroke="#444441" stroke-width="1" opacity="0.4" marker-end="url(#a6)"/>
+    <path d="M340 370 L340 434" fill="none" stroke="#444441" stroke-width="1" opacity="0.4" marker-end="url(#a6)"/>
+    <path d="M530 370 L420 434" fill="none" stroke="#444441" stroke-width="1" opacity="0.4" marker-end="url(#a6)"/>
+    <rect x="220" y="434" width="240" height="70" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+    <text class="th-coral" x="340" y="456" text-anchor="middle" dominant-baseline="central">Sale settles</text>
+    <text class="ts-coral" x="340" y="476" text-anchor="middle" dominant-baseline="central">Gold to seller's finances</text>
+    <text class="ts-coral" x="340" y="494" text-anchor="middle" dominant-baseline="central">Stock removed, price updates</text>
+    <path d="M460 494 Q600 500 600 200 Q600 180 520 180" fill="none" stroke="#854F0B" stroke-width="1" stroke-dasharray="5 3" opacity="0.4" marker-end="url(#a6)"/>
+    <path d="M260 504 L150 568" fill="none" stroke="#444441" stroke-width="1" opacity="0.4" marker-end="url(#a6)"/>
+    <path d="M420 504 L530 568" fill="none" stroke="#444441" stroke-width="1" opacity="0.4" marker-end="url(#a6)"/>
+    <rect x="60" y="568" width="180" height="56" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th" x="150" y="590" text-anchor="middle" dominant-baseline="central">Player revenue</text>
+    <text class="ts" x="150" y="608" text-anchor="middle" dominant-baseline="central">Into player finances</text>
+    <rect x="440" y="568" width="180" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="530" y="590" text-anchor="middle" dominant-baseline="central">NPC revenue</text>
+    <text class="ts-teal" x="530" y="608" text-anchor="middle" dominant-baseline="central">Into NPC finances</text>
+    </svg>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       7. CITY AI PROCUREMENT
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Trade</div>
+    <h2>City AI procurement</h2>
+    <p class="section-desc">The city buys from the market on a schedule to upkeep services — guards need swords and armour, administration needs paper. Scales with city size. Deferred demand accumulates and spikes price when stock returns.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 580" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a7" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <rect x="40" y="20" width="600" height="160" rx="14" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="60" y="48" dominant-baseline="central">City AI procurement</text>
+    <text class="ts-teal" x="60" y="68" dominant-baseline="central">Buys on a schedule — consistent demand floor regardless of NPC needs</text>
+    <rect x="60" y="80" width="180" height="80" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="150" y="104" text-anchor="middle" dominant-baseline="central">Military</text>
+    <text class="ts-teal" x="150" y="122" text-anchor="middle" dominant-baseline="central">1 sword + 1 armour</text>
+    <text class="ts-teal" x="150" y="140" text-anchor="middle" dominant-baseline="central">per 10 guards / week</text>
+    <rect x="260" y="80" width="160" height="80" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="340" y="104" text-anchor="middle" dominant-baseline="central">Administration</text>
+    <text class="ts-teal" x="340" y="122" text-anchor="middle" dominant-baseline="central">10 paper / day</text>
+    <text class="ts-teal" x="340" y="140" text-anchor="middle" dominant-baseline="central">Offices, records</text>
+    <rect x="440" y="80" width="180" height="80" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="530" y="104" text-anchor="middle" dominant-baseline="central">Other services</text>
+    <text class="ts-teal" x="530" y="122" text-anchor="middle" dominant-baseline="central">Food, medicine, fuel</text>
+    <text class="ts-teal" x="530" y="140" text-anchor="middle" dominant-baseline="central">Scales with city size</text>
+    <path d="M150 200 L280 274" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a7)"/>
+    <path d="M340 200 L340 274" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a7)"/>
+    <path d="M530 200 L400 274" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a7)"/>
+    <rect x="220" y="274" width="240" height="70" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="340" y="296" text-anchor="middle" dominant-baseline="central">City buys from market</text>
+    <text class="ts-green" x="340" y="316" text-anchor="middle" dominant-baseline="central">At current auto price</text>
+    <text class="ts-green" x="340" y="334" text-anchor="middle" dominant-baseline="central">Stock removed, price updates</text>
+    <path d="M280 344 L160 408" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a7)"/>
+    <path d="M400 344 L520 408" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a7)"/>
+    <rect x="60" y="408" width="200" height="56" rx="8" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.5"/>
+    <text class="th-red" x="160" y="430" text-anchor="middle" dominant-baseline="central">Stock unavailable</text>
+    <text class="ts-red" x="160" y="448" text-anchor="middle" dominant-baseline="central">Order deferred, need grows</text>
+    <rect x="420" y="408" width="200" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="520" y="430" text-anchor="middle" dominant-baseline="central">Gold to seller</text>
+    <text class="ts-green" x="520" y="448" text-anchor="middle" dominant-baseline="central">Flows into business revenue</text>
+    <rect x="60" y="504" width="200" height="56" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="160" y="526" text-anchor="middle" dominant-baseline="central">Demand accumulates</text>
+    <text class="ts-amber" x="160" y="544" text-anchor="middle" dominant-baseline="central">Price spikes when stock returns</text>
+    <line x1="160" y1="464" x2="160" y2="504" stroke="#444441" stroke-width="1" marker-end="url(#a7)"/>
+    </svg>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       8. FINANCES
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Finances</div>
+    <h2>Finances flow</h2>
+    <p class="section-desc">Revenue flows in real time on each sale. Wages, upkeep, and taxes are deducted at end of day. A city loan provides a grace period lifeline before bankruptcy.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 880" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a8" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <rect x="220" y="30" width="240" height="56" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+    <text class="th-coral" x="340" y="52" text-anchor="middle" dominant-baseline="central">Revenue — real time</text>
+    <text class="ts-coral" x="340" y="70" text-anchor="middle" dominant-baseline="central">Gold flows in on each sale</text>
+    <line x1="340" y1="86" x2="340" y2="130" stroke="#444441" stroke-width="1" marker-end="url(#a8)"/>
+    <rect x="220" y="130" width="240" height="56" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+    <text class="th-coral" x="340" y="152" text-anchor="middle" dominant-baseline="central">One-off costs — instant</text>
+    <text class="ts-coral" x="340" y="170" text-anchor="middle" dominant-baseline="central">Materials, workshop upgrades</text>
+    <line x1="340" y1="186" x2="340" y2="230" stroke="#444441" stroke-width="1" marker-end="url(#a8)"/>
+    <rect x="160" y="230" width="360" height="140" rx="12" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="340" y="256" text-anchor="middle" dominant-baseline="central">End of day deductions</text>
+    <text class="ts-amber" x="340" y="274" text-anchor="middle" dominant-baseline="central">Applied once per day at midnight</text>
+    <rect x="178" y="288" width="100" height="64" rx="6" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="228" y="310" text-anchor="middle" dominant-baseline="central">Wages</text>
+    <text class="ts-amber" x="228" y="328" text-anchor="middle" dominant-baseline="central">Per worker</text>
+    <text class="ts-amber" x="228" y="344" text-anchor="middle" dominant-baseline="central">Daily</text>
+    <rect x="290" y="288" width="100" height="64" rx="6" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="340" y="310" text-anchor="middle" dominant-baseline="central">Upkeep</text>
+    <text class="ts-amber" x="340" y="328" text-anchor="middle" dominant-baseline="central">Per building</text>
+    <text class="ts-amber" x="340" y="344" text-anchor="middle" dominant-baseline="central">Daily</text>
+    <rect x="402" y="288" width="100" height="64" rx="6" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="452" y="310" text-anchor="middle" dominant-baseline="central">Taxes</text>
+    <text class="ts-amber" x="452" y="328" text-anchor="middle" dominant-baseline="central">City rate</text>
+    <text class="ts-amber" x="452" y="344" text-anchor="middle" dominant-baseline="central">Weekly</text>
+    <line x1="340" y1="370" x2="340" y2="414" stroke="#444441" stroke-width="1" marker-end="url(#a8)"/>
+    <rect x="220" y="414" width="240" height="56" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+    <text class="th-coral" x="340" y="436" text-anchor="middle" dominant-baseline="central">Net profit / loss</text>
+    <text class="ts-coral" x="340" y="454" text-anchor="middle" dominant-baseline="central">Revenue minus all expenses</text>
+    <path d="M280 470 L160 524" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a8)"/>
+    <path d="M400 470 L520 524" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a8)"/>
+    <rect x="60" y="524" width="200" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="160" y="546" text-anchor="middle" dominant-baseline="central">Profitable</text>
+    <text class="ts-green" x="160" y="564" text-anchor="middle" dominant-baseline="central">Gold accumulates — reinvest</text>
+    <rect x="420" y="524" width="200" height="56" rx="8" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.5"/>
+    <text class="th-red" x="520" y="546" text-anchor="middle" dominant-baseline="central">Running at a loss</text>
+    <text class="ts-red" x="520" y="564" text-anchor="middle" dominant-baseline="central">Gold drains from reserves</text>
+    <line x1="520" y1="580" x2="520" y2="624" stroke="#444441" stroke-width="1" marker-end="url(#a8)"/>
+    <rect x="380" y="624" width="200" height="70" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="480" y="646" text-anchor="middle" dominant-baseline="central">Grace period</text>
+    <text class="ts-amber" x="480" y="666" text-anchor="middle" dominant-baseline="central">N days to recover</text>
+    <text class="ts-amber" x="480" y="684" text-anchor="middle" dominant-baseline="central">Sell stock, cut wages</text>
+    <path d="M380 652 L260 704" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a8)"/>
+    <rect x="60" y="704" width="200" height="70" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+    <text class="th-blue" x="160" y="726" text-anchor="middle" dominant-baseline="central">City loan</text>
+    <text class="ts-blue" x="160" y="746" text-anchor="middle" dominant-baseline="central">Gold upfront, interest added</text>
+    <text class="ts-blue" x="160" y="764" text-anchor="middle" dominant-baseline="central">Repaid from end of day cut</text>
+    <path d="M160 774 Q60 820 60 470 Q60 442 80 442" fill="none" stroke="#185FA5" stroke-width="1" stroke-dasharray="5 3" opacity="0.45" marker-end="url(#a8)"/>
+    <path d="M480 694 L480 754" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a8)"/>
+    <path d="M260 740 L200 784" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a8)"/>
+    <rect x="280" y="784" width="160" height="44" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="360" y="806" text-anchor="middle" dominant-baseline="central">Recovered</text>
+    <rect x="460" y="784" width="180" height="44" rx="8" fill="#FCEBEB" stroke="#A32D2D" stroke-width="0.5"/>
+    <text class="th-red" x="550" y="806" text-anchor="middle" dominant-baseline="central">Bankruptcy</text>
+    <path d="M480 750 L360 784" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a8)"/>
+    <path d="M540 750 L540 784" fill="none" stroke="#444441" stroke-width="1" opacity="0.45" marker-end="url(#a8)"/>
+    </svg>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       9. GROWTH
+  ═══════════════════════════════════════════════ -->
+  <div class="section">
+    <div class="section-label">Growth</div>
+    <h2>Reinvestment &amp; growth</h2>
+    <p class="section-desc">Profit can be reinvested into buildings, upgrades, staff, a second trade, or extraction buildings. All construction takes in-game time. Growth feeds back into better production capacity.</p>
+    <div class="diagram">
+    <svg width="100%" viewBox="0 0 680 740" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <marker id="a9" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+        <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+      </marker>
+    </defs>
+    <rect x="220" y="30" width="240" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="340" y="52" text-anchor="middle" dominant-baseline="central">Profit accumulated</text>
+    <text class="ts-green" x="340" y="70" text-anchor="middle" dominant-baseline="central">Player chooses how to reinvest</text>
+    <line x1="340" y1="86" x2="340" y2="130" stroke="#444441" stroke-width="1" marker-end="url(#a9)"/>
+    <rect x="40" y="130" width="600" height="160" rx="14" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+    <text class="th-gray" x="60" y="158" dominant-baseline="central">Reinvestment options</text>
+    <rect x="58" y="168" width="108" height="100" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th" x="112" y="196" text-anchor="middle" dominant-baseline="central">Buy building</text>
+    <text class="ts" x="112" y="214" text-anchor="middle" dominant-baseline="central">New workshop</text>
+    <text class="ts" x="112" y="230" text-anchor="middle" dominant-baseline="central">or storefront</text>
+    <text class="ts" x="112" y="248" text-anchor="middle" dominant-baseline="central">Time to build</text>
+    <rect x="178" y="168" width="108" height="100" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="232" y="196" text-anchor="middle" dominant-baseline="central">Upgrade</text>
+    <text class="ts-teal" x="232" y="214" text-anchor="middle" dominant-baseline="central">Speed, slots,</text>
+    <text class="ts-teal" x="232" y="230" text-anchor="middle" dominant-baseline="central">resource yield</text>
+    <text class="ts-teal" x="232" y="248" text-anchor="middle" dominant-baseline="central">Time to build</text>
+    <rect x="298" y="168" width="108" height="100" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="352" y="196" text-anchor="middle" dominant-baseline="central">Hire staff</text>
+    <text class="ts-teal" x="352" y="214" text-anchor="middle" dominant-baseline="central">Fill headcount</text>
+    <text class="ts-teal" x="352" y="230" text-anchor="middle" dominant-baseline="central">up to slot limit</text>
+    <text class="ts-teal" x="352" y="248" text-anchor="middle" dominant-baseline="central">Instant</text>
+    <rect x="418" y="168" width="108" height="100" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+    <text class="th" x="472" y="196" text-anchor="middle" dominant-baseline="central">2nd business</text>
+    <text class="ts" x="472" y="214" text-anchor="middle" dominant-baseline="central">New trade type</text>
+    <text class="ts" x="472" y="230" text-anchor="middle" dominant-baseline="central">new market</text>
+    <text class="ts" x="472" y="248" text-anchor="middle" dominant-baseline="central">Time to build</text>
+    <rect x="538" y="168" width="82" height="100" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="579" y="196" text-anchor="middle" dominant-baseline="central">Buy mine</text>
+    <text class="ts-green" x="579" y="214" text-anchor="middle" dominant-baseline="central">Secure raw</text>
+    <text class="ts-green" x="579" y="230" text-anchor="middle" dominant-baseline="central">supply chain</text>
+    <text class="ts-green" x="579" y="248" text-anchor="middle" dominant-baseline="central">Time to build</text>
+    <path d="M112 268 L200 332" fill="none" stroke="#444441" stroke-width="1" opacity="0.4" marker-end="url(#a9)"/>
+    <path d="M232 268 L280 332" fill="none" stroke="#444441" stroke-width="1" opacity="0.4" marker-end="url(#a9)"/>
+    <path d="M352 268 L340 332" fill="none" stroke="#444441" stroke-width="1" opacity="0.4" marker-end="url(#a9)"/>
+    <path d="M472 268 L400 332" fill="none" stroke="#444441" stroke-width="1" opacity="0.4" marker-end="url(#a9)"/>
+    <path d="M579 268 L480 332" fill="none" stroke="#444441" stroke-width="1" opacity="0.4" marker-end="url(#a9)"/>
+    <rect x="160" y="332" width="360" height="70" rx="8" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+    <text class="th-amber" x="340" y="354" text-anchor="middle" dominant-baseline="central">Construction in progress</text>
+    <text class="ts-amber" x="340" y="374" text-anchor="middle" dominant-baseline="central">Gold spent upfront — takes in-game time</text>
+    <text class="ts-amber" x="340" y="392" text-anchor="middle" dominant-baseline="central">Business runs normally meanwhile</text>
+    <line x1="340" y1="402" x2="340" y2="446" stroke="#444441" stroke-width="1" marker-end="url(#a9)"/>
+    <rect x="220" y="446" width="240" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+    <text class="th-green" x="340" y="468" text-anchor="middle" dominant-baseline="central">Construction complete</text>
+    <text class="ts-green" x="340" y="486" text-anchor="middle" dominant-baseline="central">New capacity comes online</text>
+    <line x1="340" y1="502" x2="340" y2="546" stroke="#444441" stroke-width="1" marker-end="url(#a9)"/>
+    <rect x="100" y="546" width="480" height="100" rx="14" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="120" y="572" dominant-baseline="central">Feeds back into production loop</text>
+    <rect x="118" y="584" width="130" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="183" y="606" text-anchor="middle" dominant-baseline="central">More output</text>
+    <rect x="275" y="584" width="130" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="340" y="606" text-anchor="middle" dominant-baseline="central">More workers</text>
+    <rect x="432" y="584" width="130" height="44" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+    <text class="th-teal" x="497" y="606" text-anchor="middle" dominant-baseline="central">Secured supply</text>
+    <path d="M183 628 Q183 680 340 690 Q480 700 497 628" fill="none" stroke="#1D9E75" stroke-width="1" stroke-dasharray="5 3" opacity="0.4" marker-end="url(#a9)"/>
+    </svg>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>
