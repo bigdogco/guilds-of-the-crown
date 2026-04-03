@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Guild — Economic Loop</title>
   <link rel="stylesheet" href="../assets/theme.css" />
+  <link rel="stylesheet" href="../assets/nav.css" />
   <style>
     body {
       font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
@@ -42,33 +43,32 @@
       width: 100%;
       max-width: 720px;
       margin: 0 auto;
-      background: #ffffff;
-      border: 1px solid #e8e6df;
+      background: var(--panel);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 16px;
     }
 
-    .th      { font-size: 14px; font-weight: 500; fill: #3C3489; }
-    .ts      { font-size: 12px; font-weight: 400; fill: #534AB7; }
-    .th-teal { font-size: 14px; font-weight: 500; fill: #085041; }
-    .ts-teal { font-size: 12px; font-weight: 400; fill: #0F6E56; }
-    .th-amber{ font-size: 14px; font-weight: 500; fill: #633806; }
-    .ts-amber{ font-size: 12px; font-weight: 400; fill: #854F0B; }
-    .th-coral{ font-size: 14px; font-weight: 500; fill: #712B13; }
-    .ts-coral{ font-size: 12px; font-weight: 400; fill: #993C1D; }
-    .th-gray { font-size: 14px; font-weight: 500; fill: #444441; }
-    .th-green{ font-size: 14px; font-weight: 500; fill: #27500A; }
-    .ts-green{ font-size: 12px; font-weight: 400; fill: #3B6D11; }
-    .th-blue { font-size: 14px; font-weight: 500; fill: #0C447C; }
-    .ts-blue { font-size: 12px; font-weight: 400; fill: #185FA5; }
-    .label   { font-size: 10px; fill: #888780; letter-spacing: 0.05em; }
-    .phase   { font-size: 11px; fill: #888780; opacity: 0.55; }
+    .th      { font-size: 14px; font-weight: 500; fill: #111110; }
+    .ts      { font-size: 12px; font-weight: 400; fill: #111110; }
+    .th-teal { font-size: 14px; font-weight: 500; fill: #111110; }
+    .ts-teal { font-size: 12px; font-weight: 400; fill: #111110; }
+    .th-amber{ font-size: 14px; font-weight: 500; fill: #111110; }
+    .ts-amber{ font-size: 12px; font-weight: 400; fill: #111110; }
+    .th-coral{ font-size: 14px; font-weight: 500; fill: #111110; }
+    .ts-coral{ font-size: 12px; font-weight: 400; fill: #111110; }
+    .th-gray { font-size: 14px; font-weight: 500; fill: #111110; }
+    .th-green{ font-size: 14px; font-weight: 500; fill: #111110; }
+    .ts-green{ font-size: 12px; font-weight: 400; fill: #111110; }
+    .th-blue { font-size: 14px; font-weight: 500; fill: #111110; }
+    .ts-blue { font-size: 12px; font-weight: 400; fill: #111110; }
+    .label   { font-size: 10px; fill: #555552; letter-spacing: 0.05em; }
+    .phase   { font-size: 11px; fill: #555552; }
   </style>
 </head>
 <body>
-
+  <div id="content">
   <main class="page">
-      <a class="back-link" href="../index.html">← Back</a>
   <h1>Guild — Economic Loop</h1>
   <p>Full economic simulation — all phases and design decisions captured</p>
   <div class="diagram">
@@ -222,5 +222,7 @@
   </svg>
   </div>
   </main>
+  </div>
+  <script src="../assets/nav.js"></script>
 </body>
 </html>
