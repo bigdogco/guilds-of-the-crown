@@ -1,21 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Guild Economic Loop</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guild — Economic Loop</title>
   <link rel="stylesheet" href="../assets/theme.css" />
   <style>
     body {
-      font-family: sans-serif;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       background: var(--bg);
       margin: 0;
       padding: 32px 16px;
       color: var(--text);
     }
-    h1 { font-size: 20px; font-weight: 500; color: #2C2C2A; margin-bottom: 8px; }
-    p  { font-size: 13px; color: #888780; margin-bottom: 24px; }
-    .diagram { width: 100%; max-width: 720px; background: #ffffff; }
+
+    /* Page panel frame (like index.html) */
+    .page {
+      width: min(860px, calc(100% - 32px));
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px 28px;
+    }
+
+    h1 {
+      font-size: 20px;
+      font-weight: 650;
+      color: var(--text);
+      margin: 0 0 8px 0;
+    }
+
+    p {
+      font-size: 13px;
+      color: var(--muted);
+      margin: 0 0 24px 0;
+    }
+
+    /* Diagram frame */
+    .diagram {
+      width: 100%;
+      max-width: 720px;
+      margin: 0 auto;
+      background: #ffffff;
+      border: 1px solid #e8e6df;
+      border-radius: 12px;
+      padding: 16px;
+    }
+
     .th      { font-size: 14px; font-weight: 500; fill: #3C3489; }
     .ts      { font-size: 12px; font-weight: 400; fill: #534AB7; }
     .th-teal { font-size: 14px; font-weight: 500; fill: #085041; }
@@ -31,14 +63,6 @@
     .ts-blue { font-size: 12px; font-weight: 400; fill: #185FA5; }
     .label   { font-size: 10px; fill: #888780; letter-spacing: 0.05em; }
     .phase   { font-size: 11px; fill: #888780; opacity: 0.55; }
-    .page {
-      width: min(860px, calc(100% - 32px));
-      margin: 0 auto;
-      background: var(--panel);
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 36px 28px;
-    }
   </style>
 </head>
 <body>

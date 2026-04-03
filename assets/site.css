@@ -4,7 +4,7 @@
   --card: rgb(255, 246, 236);
 }
 
-main {
+main.home {
   width: min(860px, calc(100% - 32px));
   margin: 32px auto;
   background: var(--panel);
@@ -74,7 +74,7 @@ h2 {
 }
 
 @media (max-width: 760px) {
-  main { padding: 28px 18px; }
+  main.home { padding: 28px 18px; }
   h1 { font-size: 26px; }
   .grid { grid-template-columns: 1fr; }
 }

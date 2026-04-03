@@ -1,66 +1,82 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Guild Economic Loop — Detailed Diagrams</title>
   <link rel="stylesheet" href="../assets/theme.css" />
   <style>
     body {
-      font-family: sans-serif;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
       background: var(--bg);
       margin: 0;
       padding: 32px 16px;
-      color: #2C2C2A;
+      color: var(--text);
     }
+
+    /* Panel frame like index.html */
     .page {
-      max-width: 760px;
+      width: min(860px, calc(100% - 32px));
       margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px 28px;
     }
+
     h1 {
       font-size: 22px;
-      font-weight: 500;
-      color: #2C2C2A;
-      margin-bottom: 6px;
+      font-weight: 650;
+      color: var(--text);
+      margin: 0 0 6px 0;
     }
+
     .subtitle {
       font-size: 13px;
-      color: #888780;
-      margin-bottom: 48px;
+      color: var(--muted);
+      margin: 0 0 48px 0;
     }
+
     .section {
       margin-bottom: 64px;
     }
+
     .section-label {
       font-size: 10px;
-      font-weight: 500;
+      font-weight: 650;
       letter-spacing: 0.1em;
-      color: #888780;
+      color: var(--muted);
       text-transform: uppercase;
       margin-bottom: 6px;
     }
+
     h2 {
       font-size: 17px;
-      font-weight: 500;
-      color: #2C2C2A;
+      font-weight: 650;
+      color: var(--text);
       margin: 0 0 4px 0;
     }
+
     .section-desc {
       font-size: 13px;
-      color: #888780;
-      margin-bottom: 20px;
+      color: var(--muted);
+      margin: 0 0 20px 0;
     }
+
+    /* Diagram frame */
     .diagram {
       background: #ffffff;
       border: 1px solid #e8e6df;
       border-radius: 12px;
       padding: 24px 16px;
     }
+
     .divider {
       border: none;
       border-top: 1px solid #e8e6df;
       margin: 48px 0;
     }
+
     .th      { font-size: 14px; font-weight: 500; fill: #3C3489; }
     .ts      { font-size: 12px; font-weight: 400; fill: #534AB7; }
     .th-teal { font-size: 14px; font-weight: 500; fill: #085041; }
@@ -80,6 +96,7 @@
   </style>
 </head>
 <body>
+  <main class="page">
 <div class="page">
 
   <h1>Guild — Detailed Economic Diagrams</h1>
@@ -620,5 +637,6 @@
   </div>
 
 </div>
+</main>
 </body>
 </html>
