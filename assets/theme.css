@@ -1,0 +1,20 @@
+:root {
+  --bg: rgb(242, 188, 141);
+  --text: #2c2c2a;
+  --muted: #6b6a64;
+  --link: #185fa5;
+}
+
+* { box-sizing: border-box; }
+
+html, body { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+}
+
+a { color: var(--link); }
+a:hover { text-decoration: underline; }
