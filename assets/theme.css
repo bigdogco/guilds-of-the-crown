@@ -3,6 +3,8 @@
   --text: #2c2c2a;
   --muted: #6b6a64;
   --link: #185fa5;
+  --panel: rgb(227, 165, 111);
+  --border: rgb(198, 132, 79);
 }
 
 * { box-sizing: border-box; }

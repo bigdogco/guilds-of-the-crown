@@ -9,11 +9,9 @@
     body {
       font-family: sans-serif;
       background: var(--bg);
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      padding: 32px 16px;
       margin: 0;
+      padding: 32px 16px;
+      color: var(--text);
     }
     h1 { font-size: 20px; font-weight: 500; color: #2C2C2A; margin-bottom: 8px; }
     p  { font-size: 13px; color: #888780; margin-bottom: 24px; }
@@ -33,9 +31,18 @@
     .ts-blue { font-size: 12px; font-weight: 400; fill: #185FA5; }
     .label   { font-size: 10px; fill: #888780; letter-spacing: 0.05em; }
     .phase   { font-size: 11px; fill: #888780; opacity: 0.55; }
+    .page {
+      width: min(860px, calc(100% - 32px));
+      margin: 0 auto;
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 36px 28px;
+    }
   </style>
 </head>
 <body>
+  <main class="page">
   <h1>Guild — Economic Loop</h1>
   <p>Full economic simulation — all phases and design decisions captured</p>
   <div class="diagram">
@@ -188,5 +195,6 @@
   <text class="label" x="596" y="130">City loan</text>
   </svg>
   </div>
+  </main>
 </body>
 </html>
