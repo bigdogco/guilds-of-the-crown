@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guild — AI Design Document</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      background: #f9f8f4;
+      margin: 0;
+      padding: 48px 16px;
+      color: #2C2C2A;
+      line-height: 1.65;
+    }
+    .page {
+      max-width: 760px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 24px;
+      font-weight: 500;
+      color: #2C2C2A;
+      margin: 0 0 6px 0;
+    }
+    .subtitle {
+      font-size: 13px;
+      color: #888780;
+      margin-bottom: 8px;
+    }
+    .meta {
+      font-size: 11px;
+      color: #b4b2a9;
+      letter-spacing: 0.05em;
+      margin-bottom: 40px;
+    }
+    .toc {
+      background: #ffffff;
+      border: 1px solid #e8e6df;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 48px;
+    }
+    .toc-title {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      color: #888780;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .toc ol {
+      margin: 0;
+      padding-left: 20px;
+      font-size: 14px;
+    }
+    .toc li {
+      margin-bottom: 6px;
+      color: #444441;
+    }
+    .toc a {
+      color: #444441;
+      text-decoration: none;
+    }
+    .toc a:hover {
+      color: #534AB7;
+      text-decoration: underline;
+    }
+    .section {
+      margin-bottom: 64px;
+    }
+    .section-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      color: #888780;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    h2 {
+      font-size: 20px;
+      font-weight: 500;
+      color: #2C2C2A;
+      margin: 0 0 6px 0;
+      scroll-margin-top: 24px;
+    }
+    .section-desc {
+      font-size: 13px;
+      color: #888780;
+      margin-bottom: 24px;
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 500;
+      color: #3C3489;
+      margin: 32px 0 10px 0;
+    }
+    h4 {
+      font-size: 14px;
+      font-weight: 500;
+      color: #2C2C2A;
+      margin: 20px 0 8px 0;
+    }
+    p {
+      font-size: 14px;
+      color: #444441;
+      margin: 0 0 12px 0;
+    }
+    ul, ol {
+      font-size: 14px;
+      color: #444441;
+      margin: 0 0 12px 0;
+      padding-left: 22px;
+    }
+    li {
+      margin-bottom: 6px;
+    }
+    strong {
+      font-weight: 500;
+      color: #2C2C2A;
+    }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      background: #f1efe8;
+      padding: 1px 5px;
+      border-radius: 3px;
+      color: #633806;
+    }
+    pre {
+      background: #ffffff;
+      border: 1px solid #e8e6df;
+      border-radius: 8px;
+      padding: 14px 16px;
+      overflow-x: auto;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 12px;
+      line-height: 1.55;
+      color: #444441;
+      margin: 12px 0 16px 0;
+    }
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: inherit;
+      font-size: inherit;
+    }
+    .callout {
+      background: #ffffff;
+      border: 1px solid #e8e6df;
+      border-radius: 8px;
+      padding: 14px 18px;
+      margin: 16px 0;
+    }
+    .callout-purple { border-left: 3px solid #534AB7; border-radius: 0 8px 8px 0; }
+    .callout-teal   { border-left: 3px solid #0F6E56; border-radius: 0 8px 8px 0; }
+    .callout-amber  { border-left: 3px solid #854F0B; border-radius: 0 8px 8px 0; }
+    .callout-coral  { border-left: 3px solid #993C1D; border-radius: 0 8px 8px 0; }
+    .callout-label {
+      font-size: 10px;
+      font-weight: 500;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+    .callout-purple .callout-label { color: #534AB7; }
+    .callout-teal .callout-label   { color: #0F6E56; }
+    .callout-amber .callout-label  { color: #854F0B; }
+    .callout-coral .callout-label  { color: #993C1D; }
+    .callout p:last-child { margin-bottom: 0; }
+    .divider {
+      border: none;
+      border-top: 1px solid #e8e6df;
+      margin: 48px 0;
+    }
+    .diagram {
+      background: #ffffff;
+      border: 1px solid #e8e6df;
+      border-radius: 12px;
+      padding: 24px 16px;
+      margin: 20px 0 24px 0;
+    }
+    .th      { font-size: 14px; font-weight: 500; fill: #3C3489; }
+    .ts      { font-size: 12px; font-weight: 400; fill: #534AB7; }
+    .th-teal { font-size: 14px; font-weight: 500; fill: #085041; }
+    .ts-teal { font-size: 12px; font-weight: 400; fill: #0F6E56; }
+    .th-amber{ font-size: 14px; font-weight: 500; fill: #633806; }
+    .ts-amber{ font-size: 12px; font-weight: 400; fill: #854F0B; }
+    .th-coral{ font-size: 14px; font-weight: 500; fill: #712B13; }
+    .ts-coral{ font-size: 12px; font-weight: 400; fill: #993C1D; }
+    .th-gray { font-size: 14px; font-weight: 500; fill: #444441; }
+    .label   { font-size: 10px; fill: #888780; letter-spacing: 0.05em; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+      margin: 12px 0 16px 0;
+    }
+    th, td {
+      text-align: left;
+      padding: 8px 12px;
+      border-bottom: 1px solid #e8e6df;
+      color: #444441;
+    }
+    th {
+      font-weight: 500;
+      color: #2C2C2A;
+      background: #ffffff;
+      font-size: 12px;
+    }
+    td code {
+      font-size: 11px;
+    }
+  </style>
+  <link rel="stylesheet" href="../assets/nav.css" />
+</head>
+<body>
+<div id="content">
+<div class="page">
+
+  <h1>Guild — AI Design Document</h1>
+  <p class="subtitle">Economic simulation AI architecture for Guilds of the Crown</p>
+  <p class="meta">FIRST DRAFT · DESIGN NOTES</p>
+
+  <div class="toc">
+    <div class="toc-title">Contents</div>
+    <ol>
+      <li><a href="#architecture">Core architecture — noticeboard pattern</a></li>
+      <li><a href="#traits">Trait system</a></li>
+      <li><a href="#rivals">Rival AI</a></li>
+      <li><a href="#contention">Task contention &amp; teams</a></li>
+      <li><a href="#market">Market price engine</a></li>
+      <li><a href="#legibility">Player legibility</a></li>
+    </ol>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════
+       1. ARCHITECTURE
+  ═══════════════════════════════════════════════ -->
+  <div class="section" id="architecture">
+    <div class="section-label">Foundation</div>
+    <h2>Core architecture — noticeboard pattern</h2>
+    <p class="section-desc">The spine that all other systems plug into. A blackboard pattern combined with utility-based task selection, similar to Dwarf Fortress and RimWorld.</p>
+
+    <p>The key insight: <strong>producers don't know about consumers, and consumers don't know about producers</strong>. They both just talk to noticeboards. This is what lets you scale from 20 NPCs to 200 without rewriting anything.</p>
+
+    <div class="diagram">
+      <svg width="100%" viewBox="0 0 680 420" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <marker id="arrow1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </marker>
+      </defs>
+      <text class="label" x="40" y="30">PRODUCERS</text>
+      <text class="label" x="340" y="30" text-anchor="middle">BLACKBOARD</text>
+      <text class="label" x="640" y="30" text-anchor="end">CONSUMERS</text>
+
+      <rect x="40" y="50" width="180" height="50" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text class="th" x="130" y="70" text-anchor="middle" dominant-baseline="central">CityAiSystem</text>
+      <text class="ts" x="130" y="87" text-anchor="middle" dominant-baseline="central">Needs guards, paper</text>
+
+      <rect x="40" y="115" width="180" height="50" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text class="th" x="130" y="135" text-anchor="middle" dominant-baseline="central">WorkshopSystem</text>
+      <text class="ts" x="130" y="152" text-anchor="middle" dominant-baseline="central">Needs iron, crafting</text>
+
+      <rect x="40" y="180" width="180" height="50" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text class="th" x="130" y="200" text-anchor="middle" dominant-baseline="central">MarketSystem</text>
+      <text class="ts" x="130" y="217" text-anchor="middle" dominant-baseline="central">Restock low goods</text>
+
+      <rect x="40" y="245" width="180" height="50" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+      <text class="th" x="130" y="265" text-anchor="middle" dominant-baseline="central">NpcNeedSystem</text>
+      <text class="ts" x="130" y="282" text-anchor="middle" dominant-baseline="central">Hunger, shelter</text>
+
+      <rect x="260" y="50" width="160" height="290" rx="12" fill="#FAEEDA" stroke="#854F0B" stroke-width="0.5"/>
+      <text class="th-amber" x="340" y="74" text-anchor="middle" dominant-baseline="central">Noticeboard</text>
+      <text class="ts-amber" x="340" y="92" text-anchor="middle" dominant-baseline="central">Scoped pools</text>
+      <rect x="276" y="110" width="128" height="36" rx="6" fill="#FAC775" stroke="#854F0B" stroke-width="0.5"/>
+      <text class="ts-amber" x="340" y="128" text-anchor="middle" dominant-baseline="central">City tasks</text>
+      <rect x="276" y="156" width="128" height="36" rx="6" fill="#FAC775" stroke="#854F0B" stroke-width="0.5"/>
+      <text class="ts-amber" x="340" y="174" text-anchor="middle" dominant-baseline="central">Workshop tasks</text>
+      <rect x="276" y="202" width="128" height="36" rx="6" fill="#FAC775" stroke="#854F0B" stroke-width="0.5"/>
+      <text class="ts-amber" x="340" y="220" text-anchor="middle" dominant-baseline="central">Gather tasks</text>
+      <rect x="276" y="248" width="128" height="36" rx="6" fill="#FAC775" stroke="#854F0B" stroke-width="0.5"/>
+      <text class="ts-amber" x="340" y="266" text-anchor="middle" dominant-baseline="central">Trade tasks</text>
+      <rect x="276" y="294" width="128" height="36" rx="6" fill="#FAC775" stroke="#854F0B" stroke-width="0.5"/>
+      <text class="ts-amber" x="340" y="312" text-anchor="middle" dominant-baseline="central">Personal needs</text>
+
+      <rect x="460" y="50" width="180" height="50" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+      <text class="th-teal" x="550" y="70" text-anchor="middle" dominant-baseline="central">Guard NPC</text>
+      <text class="ts-teal" x="550" y="87" text-anchor="middle" dominant-baseline="central">Picks guard tasks</text>
+
+      <rect x="460" y="115" width="180" height="50" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+      <text class="th-teal" x="550" y="135" text-anchor="middle" dominant-baseline="central">Blacksmith worker</text>
+      <text class="ts-teal" x="550" y="152" text-anchor="middle" dominant-baseline="central">Picks forge tasks</text>
+
+      <rect x="460" y="180" width="180" height="50" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+      <text class="th-teal" x="550" y="200" text-anchor="middle" dominant-baseline="central">Gatherer NPC</text>
+      <text class="ts-teal" x="550" y="217" text-anchor="middle" dominant-baseline="central">Picks forage tasks</text>
+
+      <rect x="460" y="245" width="180" height="50" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+      <text class="th-teal" x="550" y="265" text-anchor="middle" dominant-baseline="central">Trader NPC</text>
+      <text class="ts-teal" x="550" y="282" text-anchor="middle" dominant-baseline="central">Picks haul tasks</text>
+
+      <line x1="220" y1="75" x2="258" y2="128" stroke="#888780" stroke-width="1" opacity="0.5" marker-end="url(#arrow1)"/>
+      <line x1="220" y1="140" x2="258" y2="174" stroke="#888780" stroke-width="1" opacity="0.5" marker-end="url(#arrow1)"/>
+      <line x1="220" y1="205" x2="258" y2="220" stroke="#888780" stroke-width="1" opacity="0.5" marker-end="url(#arrow1)"/>
+      <line x1="220" y1="270" x2="258" y2="312" stroke="#888780" stroke-width="1" opacity="0.5" marker-end="url(#arrow1)"/>
+
+      <line x1="422" y1="128" x2="458" y2="75" stroke="#888780" stroke-width="1" opacity="0.5" marker-end="url(#arrow1)"/>
+      <line x1="422" y1="174" x2="458" y2="140" stroke="#888780" stroke-width="1" opacity="0.5" marker-end="url(#arrow1)"/>
+      <line x1="422" y1="220" x2="458" y2="205" stroke="#888780" stroke-width="1" opacity="0.5" marker-end="url(#arrow1)"/>
+      <line x1="422" y1="266" x2="458" y2="270" stroke="#888780" stroke-width="1" opacity="0.5" marker-end="url(#arrow1)"/>
+
+      <text class="label" x="240" y="370" text-anchor="middle">post tasks</text>
+      <text class="label" x="440" y="370" text-anchor="middle">claim tasks</text>
+      </svg>
+    </div>
+
+    <h3>The Task as a data contract</h3>
+    <p>The most important design decision is what a <code>Task</code> actually contains. Everything else flows from this.</p>
+
+<pre><code>Task:
+  id, type, category
+  postedBy, claimedBy, targetEntity, location
+  basePriority, rewardGold, payload
+  expiresAt, minSkill[], requiredTraits, preferredTraits
+  state: Posted | Claimed | InProgress | Done | Failed | Expired</code></pre>
+
+    <p>The key: <strong>the task describes the job, not who should do it</strong>. Matching happens at claim-time via utility scoring. A guard task doesn't say "guard NPC required" — it says "requires Combat skill ≥ 3, prefers Brave trait." Any NPC who qualifies can consider it. This means you can add new NPC archetypes later without touching the task posters.</p>
+
+    <h3>Scoped noticeboards — not one global list</h3>
+    <p>Don't maintain one giant list and make every NPC scan it every tick. Instead, maintain several scoped pools:</p>
+    <ul>
+      <li><strong>City board</strong> — posted by CityAiSystem, visible to unemployed townspeople, guards, clerks</li>
+      <li><strong>Workshop board (per business)</strong> — visible only to employees of that workshop</li>
+      <li><strong>Regional gather board</strong> — visible to gatherers, lumberjacks, hunters</li>
+      <li><strong>Trade caravan board</strong> — long-haul tasks for merchants and hauliers</li>
+      <li><strong>Personal needs board</strong> — one per NPC, their own queue of hunger/sleep/socialise tasks</li>
+    </ul>
+    <p>NPCs have a <code>TaskSubscriptions</code> component listing which boards to check and in what order. A workshop employee checks: personal needs (urgent) → their workshop board → fallback to city board if unemployed. This gives you the "guard checks guard tasks first" behaviour cheaply.</p>
+
+    <h3>Task selection: utility scoring</h3>
+    <p>When an NPC becomes idle, they score candidates with a utility function:</p>
+
+<pre><code>utility = basePriority
+        × traitAffinity(npc, task)
+        × skillFit(npc, task)
+        × (1 / (1 + distance × distanceWeight))
+        × rewardFactor(npc.greed, task.reward)
+        × needsModifier(npc.needs)</code></pre>
+
+    <p>Each NPC's traits and attributes <strong>reshape the utility curve</strong>, which is how personality-driven emergence happens for free. A Greedy NPC weights reward heavily. A Loyal NPC has a high multiplier on employer tasks. A Lazy NPC picks nearby tasks. A Hungry NPC has work utility crushed until they eat.</p>
+
+    <div class="callout callout-purple">
+      <div class="callout-label">Performance tip</div>
+      <p>Don't score every task every tick. Only re-score when (a) a new task is posted to a subscribed board, (b) the NPC finishes their current task, or (c) a major event flag flips (needs critical, employer changed). Use signal handlers on Task construction to dirty-flag subscribed NPCs.</p>
+    </div>
+
+    <h3>How economic systems plug in</h3>
+    <ul>
+      <li><strong>CityAiSystem</strong> — posts BuyFromMarket, GuardPatrol, EmergencyImport tasks on schedule</li>
+      <li><strong>WorkshopSystem</strong> — posts FetchResource and CraftRecipe tasks to each workshop's board</li>
+      <li><strong>MarketSystem</strong> — mostly reactive (holds price engine), posts Restock hints when stock is low</li>
+      <li><strong>RivalAiSystem</strong> — each rival is a BusinessBrain entity posting to its own workshop boards</li>
+      <li><strong>NpcNeedSystem</strong> — decays needs, posts personal tasks when thresholds crossed</li>
+    </ul>
+    <p>The economic loop now <strong>drives itself</strong>: NPCs get hungry → they buy bread → bakery revenue rises → baker posts craft tasks → employees gather wheat → wheat demand rises → farmers prosper. No system needs to know about any other — they all communicate through noticeboards and the market.</p>
+
+    <h3>System tick order</h3>
+    <ol>
+      <li>NeedsSystem — decay needs, post personal tasks</li>
+      <li>CityAiSystem — check stocks, post city tasks</li>
+      <li>WorkshopSystem + RivalAiSystem — check inventories, post workshop tasks</li>
+      <li>MarketSystem — update prices, post restock hints</li>
+      <li>NpcTaskSelectionSystem — idle NPCs score and claim</li>
+      <li>NpcActionSystem — NPCs execute claimed tasks</li>
+      <li>FinanceSystem — settle real-time revenue events</li>
+      <li>EndOfDaySystem (daily) — wages, upkeep, taxes, loan repayments</li>
+    </ol>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       2. TRAITS
+  ═══════════════════════════════════════════════ -->
+  <div class="section" id="traits">
+    <div class="section-label">NPC Identity</div>
+    <h2>Trait system</h2>
+    <p class="section-desc">Data-driven personality system that reshapes utility scoring. Traits are separate from attributes and skills — each plugs into behaviour differently.</p>
+
+    <h3>Three distinct concepts</h3>
+    <ul>
+      <li><strong>Attributes</strong> — Strength, Intellect, Charisma, Dexterity, Constitution. Rarely change. Modify <em>execution</em> (faster craft, more carry weight).</li>
+      <li><strong>Skills</strong> — Smithing, Baking, Combat, Haggling, Gathering, Literacy. Grow through doing, modulated by attributes. Modify <em>quality and speed</em>.</li>
+      <li><strong>Traits</strong> — Greedy, Loyal, Brave, Lazy, Honest, Ambitious. Rarely change. An NPC has 2-4 at any time. Modify <em>decision-making</em>.</li>
+    </ul>
+
+    <h3>Core vs acquired traits</h3>
+    <p><strong>Starting traits (3-5)</strong> are the NPC's core identity from background at spawn. Unlikely to ever be lost. These are "who this person is."</p>
+    <p><strong>Acquired traits</strong> sit on top, earned through life events. More volatile — can be lost if conditions reverse. These are "what this person has lived through." Trait cap: 20 total.</p>
+
+    <div class="callout callout-teal">
+      <div class="callout-label">Example</div>
+      <p><strong>Hilda (Blacksmith's daughter)</strong><br>
+      Core: Hardworking, Proud, Loyal<br>
+      Acquired: Battle-scarred, Bitter</p>
+    </div>
+
+    <h3>Traits as tagged utility modifiers</h3>
+    <p>Instead of hardcoding trait behaviour in the scoring function, each trait <em>declares</em> how it bends the utility formula. New traits are just new data.</p>
+
+<pre><code>TraitDef:
+  id, name, description
+  modifiers: list of UtilityModifier
+  incompatibleWith: list of TraitId
+  synergyWith: list of TraitId
+
+UtilityModifier:
+  target (RewardWeight, DistanceWeight, LoyaltyBonus, etc.)
+  filter (category, tag, poster)
+  multiplier, addend</code></pre>
+
+    <h4>Example trait definitions</h4>
+<pre><code>Greedy
+  reward_weight × 2.0 (any task)
+  loyalty_bonus × 0.3 (any task)
+  incompatibleWith: Generous, Ascetic
+
+Loyal
+  loyalty_bonus × 3.0 (poster = employer)
+  reward_weight × 0.5 (poster ≠ employer)
+  incompatibleWith: Fickle, Mercenary
+
+Lazy
+  distance_weight × 2.5 (any task)
+  base_priority −0.1 (any task)
+  incompatibleWith: Industrious
+
+Ambitious
+  skill_growth_weight × 1.8 (any task)
+  reward_weight × 1.5 (tag = promotion_path)
+
+Brave
+  risk_tolerance +0.5
+  base_priority × 1.4 (category = combat)
+  incompatibleWith: Cowardly</code></pre>
+
+    <h3>Where traits come from</h3>
+    <p><strong>At spawn</strong> — roll from a weighted table based on background. A mining town produces more Brave/Tough workers; a merchant city more Shrewd/Worldly ones. Town character emerges naturally.</p>
+    <p><strong>Earned through play</strong> — traits can be gained (rarely) from sustained conditions. An NPC underpaid for months may gain Bitter. An NPC who survives combat may gain Veteran. Most trait gains should be <strong>conditional on sustained behaviour</strong>, not single events.</p>
+
+<pre><code>TraitGainRule (Bitter):
+  trigger: underpaid X days in a row, OR
+           wage_request rejected Y times
+  chance_per_check: 0.15
+  check_frequency: weekly
+  prerequisites: not has(Content), not has(Cheerful)
+  erodes: Loyal, Content, Trusting</code></pre>
+
+    <h3>Trait loss rules</h3>
+    <p>Loss rules are <strong>stricter</strong> than gain rules — traits should be sticky once earned. An NPC who became Bitter during a rough patch might take a full season of good treatment to shed it. Core traits should be essentially unlosable.</p>
+
+    <h3>Suggested starter set (~20)</h3>
+    <ul>
+      <li><strong>Work ethic</strong> — Hardworking, Lazy, Ambitious, Complacent</li>
+      <li><strong>Money</strong> — Greedy, Generous, Frugal</li>
+      <li><strong>Loyalty</strong> — Loyal, Fickle, Opportunistic</li>
+      <li><strong>Courage</strong> — Brave, Cowardly</li>
+      <li><strong>Social</strong> — Charming, Gruff, Honest, Deceitful</li>
+      <li><strong>Life experience (acquired)</strong> — Veteran, Bitter, Drunkard, Pious</li>
+    </ul>
+
+    <div class="callout callout-amber">
+      <div class="callout-label">Failure mode to watch for</div>
+      <p>Trait effects getting swamped by base utility math. When tuning, first get the base utility reasonable <em>without</em> traits, then add traits with larger-than-intuitive multipliers (1.5x-3x, not 1.1x). Trait presence should visibly shift decisions. Players should say "my Loyal blacksmith stayed when the rival offered more" and actually notice it.</p>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       3. RIVAL AI
+  ═══════════════════════════════════════════════ -->
+  <div class="section" id="rivals">
+    <div class="section-label">Competition</div>
+    <h2>Rival AI</h2>
+    <p class="section-desc">NPC-run businesses that compete with the player using the same systems. No special cases, no scripting — rivals are just player-businesses driven by a RivalBrain decision layer.</p>
+
+    <h3>Core principle: rivals are player-businesses with an AI driver</h3>
+    <p>A rival business is an entity with the exact same components as a player business: workshop, employees, inventory, finances, market presence. The only difference is that instead of a human making decisions, a <code>RivalBrain</code> component drives it.</p>
+    <ul>
+      <li>Rivals use your WorkshopSystem, MarketSystem, FinanceSystem identically</li>
+      <li>They post to the same noticeboards</li>
+      <li>They hire from the same NPC pool</li>
+      <li>They buy and sell on the same market</li>
+      <li>They can go bankrupt and be replaced, just like the player can</li>
+    </ul>
+
+    <h3>What a rival needs to decide</h3>
+    <ol>
+      <li><strong>Production</strong> — what to craft, in what quantity, using which ingredients (daily)</li>
+      <li><strong>Sourcing</strong> — where to buy raw materials (daily)</li>
+      <li><strong>Hiring/firing</strong> — add workers, respond to wage demands (weekly)</li>
+      <li><strong>Wages</strong> — accept or reject wage-rise requests (weekly)</li>
+      <li><strong>Reinvestment</strong> — upgrade workshop, buy extraction building, expand (monthly/seasonal)</li>
+      <li><strong>Competition</strong> — respond to rivals (including player) — underbid, outproduce, coexist</li>
+    </ol>
+
+    <h3>Strategic archetypes</h3>
+    <p>Different rivals feel different through <strong>strategic archetypes</strong> — high-level business personalities that shape how the RivalBrain weights its decisions.</p>
+
+    <div class="callout callout-coral">
+      <div class="callout-label">Volume Producer</div>
+      <p>Goal: dominate through sheer output. Buys extraction buildings early, maximises worker count, cheap raw materials. Medium risk. Undercuts on volume when rivals appear.</p>
+    </div>
+
+    <div class="callout callout-purple">
+      <div class="callout-label">Quality Specialist</div>
+      <p>Goal: premium goods, highest skill tier. Hires skilled workers, upgrades workshop tier, slow careful growth. Low risk. Ignores cheap rivals, targets the high end.</p>
+    </div>
+
+    <div class="callout callout-amber">
+      <div class="callout-label">Opportunist</div>
+      <p>Goal: chase whatever's most profitable right now. Flexibility, cash reserves, cheap workers. High risk. Pivots trades if a market gets crowded, starts a second business earlier.</p>
+    </div>
+
+    <div class="callout callout-teal">
+      <div class="callout-label">Steady Merchant</div>
+      <p>Goal: reliable modest profit, don't rock the boat. Stable employees, modest reinvestment, avoid debt. Very low risk. Coexists, rarely escalates.</p>
+    </div>
+
+    <div class="callout callout-coral">
+      <div class="callout-label">The Aggressor (villain archetype, use sparingly)</div>
+      <p>Goal: dominate the market, push rivals out. Aggressive expansion, undercutting, poaching competitors' workers. High risk. Will run at a loss temporarily to bankrupt rivals. One per town max.</p>
+    </div>
+
+    <h3>Archetype as weight vector</h3>
+    <p>Archetypes are <strong>data</strong>, not code. The RivalBrain has one decision function; each archetype is a set of parameters:</p>
+
+<pre><code>Volume Producer:
+  production_weights:
+    output_per_day: 1.5
+    quality: 0.5
+    variety: 0.3
+  sourcing_weights:
+    price: 1.8
+    reliability: 0.6
+    own_supply_preference: 1.4
+  hiring_weights:
+    worker_count_target: max
+    skill_requirement: 0.4
+    wage_sensitivity: 1.5
+  reinvestment_weights:
+    cash_reserve_days: 10
+    extraction_building: 2.0
+    worker_slots: 1.8
+    workshop_upgrade: 0.7
+    second_trade: 0.5
+  competition_weights:
+    aggression: 0.7
+    dumping_threshold: 0.6
+    price_race_willingness: 0.8</code></pre>
+
+    <h3>The rival decision loop</h3>
+<pre><code>RivalBrain.tick(rival, tick_type):
+
+  if tick_type == DAILY:
+    assess_production(rival)
+    assess_sourcing(rival)
+    post_production_tasks(rival)
+    post_gather_tasks(rival)
+
+  if tick_type == WEEKLY:
+    review_employees(rival)
+    handle_wage_requests(rival)
+    consider_hiring(rival)
+    assess_competition(rival)
+
+  if tick_type == MONTHLY:
+    review_financial_health(rival)
+    consider_reinvestment(rival)
+    review_strategic_posture(rival)</code></pre>
+
+    <h3>Competition — how rivals notice each other</h3>
+    <p>Rivals observe the <strong>market</strong> the same way the player does:</p>
+<pre><code>assess_competition(rival):
+  my_share = rival.listed_stock / Market.total_stock
+  price_trend = Market.price_trend(last_14_days)
+
+  // detect dumping
+  if price_trend.dropped_by > 0.3:
+    rival.stress_level += 0.2
+    if price_race_willingness > 0.5:
+      dump_inventory(aggression)
+    else:
+      throttle_production(factor = 0.5)
+
+  // detect new rival
+  if Market.new_entrants(last_30_days) > 0:
+    log_event("new competitor noticed")
+    if aggression > 0.8:
+      post_poaching_tasks(target = new_entrant)
+
+  // detect player growing
+  if player.trade == rival.trade and player.revenue_trend > 0.5:
+    if archetype == Aggressor:
+      escalate_against_player(rival)</code></pre>
+
+    <p>Rivals react to <strong>what they can see</strong>: stock levels, price swings, new businesses appearing. They don't read the player's bank balance or intentions. This keeps them fair.</p>
+
+    <h3>Rival lifecycle</h3>
+    <p>Rivals should be mortal. A town shouldn't have the same three families forever — it should feel like a living economy.</p>
+    <ul>
+      <li><strong>Spawning</strong> — triggered when a trade becomes profitable, or on slow schedule, or as succession when a rival goes bankrupt (former employee inherits archetype loosely based on experience)</li>
+      <li><strong>Decline</strong> — uses existing bankruptcy system. When entering grace period, RivalBrain switches to "desperation mode" — slash expenses, liquidate stock</li>
+      <li><strong>Bankruptcy</strong> — entity removed, workers return to NPC pool. Player gets notification — a rival falling is a reward.</li>
+    </ul>
+
+    <h3>Making rivals feel fair (not cheating)</h3>
+    <ol>
+      <li>Rivals use the same market prices as the player</li>
+      <li>Rivals pay the same wages the player would</li>
+      <li>Rivals can fail — visibly, with notifications</li>
+      <li>Rivals don't see into player's inventory or finances — only market-visible info</li>
+      <li>Rivals' decisions should be visible in their actions (dumping = price drop player notices)</li>
+    </ol>
+    <p>One acceptable "cheat": <strong>spawning capital</strong>. A new rival needs starting gold to exist. That's worldbuilding. After spawn, they play by the same rules.</p>
+
+    <div class="callout callout-purple">
+      <div class="callout-label">Elegant property</div>
+      <p>From another rival's perspective, <strong>the player is just another rival</strong>. The <code>assess_competition</code> function treats the player identically. If the player becomes dominant, Aggressors push back. If the player is small, they're ignored. No special "challenge the player" code needed.</p>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       4. TASK CONTENTION & TEAMS
+  ═══════════════════════════════════════════════ -->
+  <div class="section" id="contention">
+    <div class="section-label">Coordination</div>
+    <h2>Task contention &amp; teams</h2>
+    <p class="section-desc">Where noticeboards stay clean or turn to spaghetti. Handling race conditions, greedy locks, priority inversion, and multi-NPC tasks.</p>
+
+    <h3>The three contention problems</h3>
+    <ol>
+      <li><strong>Race conditions</strong> — two NPCs claim the same task simultaneously</li>
+      <li><strong>Greedy locking</strong> — one NPC claims too many tasks, blocking others</li>
+      <li><strong>Priority inversion</strong> — low-priority task claimed by wrong NPC, high-priority task sits unclaimed</li>
+    </ol>
+    <p>Plus a harder structural problem: <strong>multi-NPC tasks</strong> (hauling heavy carts, raids, staffing counters).</p>
+
+    <h3>Claiming: atomic, with a short commitment</h3>
+    <p>Tasks are <strong>exclusive once claimed</strong>, and claiming is atomic:</p>
+<pre><code>claim_task(npc, task):
+  if task.state != Posted:
+    return false
+  task.state = Claimed
+  task.claimedBy = npc
+  task.claimedAt = now
+  emit TaskClaimedEvent(task, npc)
+  return true</code></pre>
+
+    <p>Single-threaded task selection means no race conditions. While an NPC is <em>scoring</em> a task, another might claim it first — that's fine, the first NPC's score is just stale and they'll re-score next pass.</p>
+
+    <h3>Claim-then-reserve, not claim-then-work</h3>
+    <p>Add a <strong>reservation timeout</strong>. When a task moves to Claimed, it has a deadline to transition to InProgress. If the deadline passes, the task auto-reverts to Posted.</p>
+
+<pre><code>check_claim_timeouts():
+  for task in all_tasks where state == Claimed:
+    if now - task.claimedAt > CLAIM_TIMEOUT:
+      release_task(task)
+
+release_task(task):
+  prior_claimer = task.claimedBy
+  task.state = Posted
+  task.claimedBy = null
+  prior_claimer.reliability -= 0.05  // optional penalty</code></pre>
+
+    <p>Short timeouts (1-2 in-game hours local, ~1 day for long-haul). Combined with reliability feeding back into utility, flaky NPCs get scored lower over time — self-correcting.</p>
+
+    <h3>Preventing greedy locking</h3>
+    <p>Rule: <strong>one active task per NPC at a time</strong>. Optional exception: <strong>queuing one "next up" task</strong> when current is near done, preventing idle gaps.</p>
+
+<pre><code>can_queue_next_task(npc):
+  return npc.currentTask != null
+     and npc.currentTask.estimatedCompletion < 5_minutes
+     and npc.queuedTask == null</code></pre>
+
+    <h3>Priority inversion — the routing problem</h3>
+    <p>Master smith Aldric's apprentice Finn claims a trivial "craft horseshoe" task. Then a Legendary Sword commission arrives (needs Smithing 8+). Finn is locked, Aldric should have been freed for the legendary work.</p>
+
+    <h4>Approach A: task-first matching (for urgent tasks)</h4>
+    <p>High-priority tasks actively solicit the best candidate:</p>
+<pre><code>post_high_priority_task(task):
+  noticeboard.add(task)
+  if task.basePriority > SOLICIT_THRESHOLD:
+    candidates = find_idle_npcs_matching(task)
+    best = argmax(candidates, score(npc, task))
+    if best != null:
+      offer_task(best, task)</code></pre>
+    <p>"Push" for urgent work, "pull" for everything else.</p>
+
+    <h4>Approach B: NPC tiering within a board (for workshops)</h4>
+<pre><code>board_selection_tick():
+  for tier in [Master, Journeyman, Apprentice, Idle]:
+    for npc in idle_npcs_in_tier(tier):
+      task = score_and_claim_best(npc, board)</code></pre>
+    <p>Use <strong>Approach A</strong> for city-level urgent tasks, <strong>Approach B</strong> for workshops where hierarchy is clear.</p>
+
+    <h3>Staleness and re-scoring</h3>
+    <ul>
+      <li><strong>Before InProgress</strong>: NPC can drop current task if alternative is ~30% better utility</li>
+      <li><strong>Once InProgress</strong>: NPC commits unless critical need (starving, under attack)</li>
+    </ul>
+    <p>This gives stable behaviour with flexibility for real emergencies. Task-switching mid-work looks jittery ("why did my worker just walk away from the forge?").</p>
+
+    <h3>Multi-NPC tasks (teams)</h3>
+    <p>Some tasks need multiple NPCs: hauling heavy carts, raiding warehouses, staffing the shop counter, manning guard towers. Use a <strong>TeamTask</strong> that holds multiple role slots:</p>
+
+<pre><code>TeamTask:
+  (everything a normal Task has, plus:)
+  roles: list of RoleSlot
+  formed: bool
+  start_when_filled: bool
+  timeout_if_unfilled: duration
+
+RoleSlot:
+  role_name: "Guard" | "Hauler" | "Lookout"
+  requirements: skill + trait filters
+  claimedBy: entity (null if open)</code></pre>
+
+    <p>NPCs claim <strong>a role</strong> within a team task. Scoring picks the best-matching open role. When all roles fill, the team forms and activates.</p>
+
+    <h4>The gathering problem</h4>
+    <p>Start with <strong>"Rally and wait"</strong> with a short formation timeout (~30 in-game min). Claimers move to rendezvous and idle. If team doesn't form in time, disband and release NPCs.</p>
+
+    <h4>Preventing team starvation</h4>
+    <ul>
+      <li><strong>Minimum viable size</strong> — "requires 3-5, starts at 3"</li>
+      <li><strong>Substitution rules</strong> — Guard slot can accept a Brave peasant at reduced effectiveness</li>
+      <li><strong>Auto-disband</strong> — if unfilled too long AND no matching idle NPCs exist</li>
+    </ul>
+
+    <h4>Team rewards</h4>
+    <ul>
+      <li>Equal split (simple)</li>
+      <li>Role-weighted (Captain 40%, Guards 20% each)</li>
+      <li>Skill-weighted</li>
+    </ul>
+    <p>This creates a lever for Greedy NPCs — they prefer tasks where they expect bigger shares.</p>
+
+    <h3>Worked example: a workshop in motion</h3>
+    <p><strong>Setup</strong>: smithy has Aldric (master, Smithing 7), Finn (apprentice, Smithing 2), Greta (gatherer). Inventory: 2 iron, 0 coal.</p>
+
+    <p><strong>Tick</strong>: WorkshopSystem inspects inventory, posts:</p>
+    <ul>
+      <li>Task A: <code>CraftRecipe(sword)</code> — needs 2 iron, 1 coal. Blocked. <em>Stays WaitingForIngredients</em></li>
+      <li>Task B: <code>FetchResource(coal, 3)</code> — urgent</li>
+      <li>Task C: <code>CraftRecipe(nail_batch)</code> — ready</li>
+      <li>Task D: <code>RepairTools</code> — low priority</li>
+    </ul>
+
+    <p><strong>NPCs score</strong>:</p>
+    <ul>
+      <li>Greta scores B highest (gather, specialty) → claims B</li>
+      <li>Finn scores C highest (matches low skill) → claims C</li>
+      <li>Aldric scored C too, but Finn claimed first; re-scores → D</li>
+    </ul>
+
+    <p><strong>Half-hour later</strong>: Greta returns with coal. Task A unblocks, flips to Posted. Aldric finishes D → claims A. Forge action begins. Finn finishes C, nothing matches, enters idle. NpcNeedSystem posts <code>Eat</code> to Finn's personal board.</p>
+
+    <div class="callout callout-teal">
+      <div class="callout-label">What happened</div>
+      <p><strong>No central orchestrator decided who does what</strong>. Each NPC scored what they saw. Priority routed the sword to the master smith. The blocked task didn't waste anyone's time. Finn self-directed into his own needs when work ran out. That's the system working.</p>
+    </div>
+
+    <div class="callout callout-amber">
+      <div class="callout-label">Build this first</div>
+      <p>For any NPC, show their <strong>last scoring pass</strong>. List every task considered, the score each received, which modifiers fired. When a player asks "why is my blacksmith making horseshoes?" you open the view and see: Finn scored Horseshoes 0.7, Sword 0.3 (Smithing 8 needed, Finn has 2); Sword scored 0.3 for everyone except Aldric (busy). Explained in ten seconds. Without this tool, you'll spend hundreds of hours guessing.</p>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       5. MARKET PRICE ENGINE
+  ═══════════════════════════════════════════════ -->
+  <div class="section" id="market">
+    <div class="section-label">Economy</div>
+    <h2>Market price engine</h2>
+    <p class="section-desc">The heart of the economy. Translates stock levels and demand pressure into current prices, updated continuously as transactions happen.</p>
+
+    <h3>Three core responsibilities</h3>
+    <ol>
+      <li>Set a price for each resource given current market conditions</li>
+      <li>Absorb transactions (deposits, purchases) and update stock</li>
+      <li>Track demand signals so price responds to what buyers are <em>trying</em> to do, not just stock</li>
+    </ol>
+
+    <h3>The basic supply/demand curve</h3>
+<pre><code>price(resource) = base_price × supply_factor × demand_factor</code></pre>
+
+    <p><code>base_price</code> is the "normal" price per recipe (production cost + modest markup). Bread 5g, sword 80g.</p>
+
+<pre><code>supply_factor(resource):
+  stock = market.stock[resource]
+  normal_stock = market.normal_level[resource]
+  ratio = stock / normal_stock
+  return clamp(1.0 / ratio, MIN_SUPPLY_MULT, MAX_SUPPLY_MULT)</code></pre>
+
+    <p>Stock at half normal → price 2x. Stock at double → price 0.5x. Clamps prevent absurdities. Reasonable: <code>MIN=0.4</code>, <code>MAX=3.0</code>.</p>
+
+    <h3>Defining "normal stock"</h3>
+    <p>Use <strong>dynamic</strong> with a slow moving average (30-day window). When a town grows, normal stock rises, prices re-baseline, economy expands smoothly.</p>
+
+<pre><code>update_normal_stock(resource):
+  recent_consumption = sum(purchases in last 30 days) / 30
+  market.normal_level[resource] = recent_consumption × NORMAL_DAYS_OF_STOCK</code></pre>
+
+    <p><code>NORMAL_DAYS_OF_STOCK</code> is a knob — 3-7 for most goods. Short for perishables, long for durables.</p>
+
+    <h3>The demand signal problem</h3>
+    <p>If you only look at stock, prices lag reality. Plague hits → everyone wants medicine → stock drains → price rises only <em>after</em> the crash.</p>
+    <p>Track <strong>demand pressure</strong> separately. Crucially, this includes <strong>failed buy attempts</strong> (NPCs who tried but couldn't because stock was empty or they couldn't afford it):</p>
+
+<pre><code>demand_factor(resource):
+  recent_demand = sum(attempted_purchases in last N ticks)
+  normal_demand = market.normal_demand[resource]
+  return clamp(recent_demand / normal_demand, MIN_DEMAND, MAX_DEMAND)</code></pre>
+
+    <p>This is how the "deferred demand → price spike when stock returns" from your diagrams actually works.</p>
+
+    <h3>Price smoothing (anti-jitter)</h3>
+    <p>If price recalculates on every transaction, it twitches each time a single NPC buys a loaf. Apply exponential smoothing:</p>
+
+<pre><code>update_price(resource):
+  target = base_price × supply_factor × demand_factor
+  current = market.price[resource]
+  market.price[resource] = current × (1 - SMOOTHING) + target × SMOOTHING</code></pre>
+
+    <p>With <code>SMOOTHING = 0.15</code>, a sudden shortage takes ~5-10 ticks to fully reflect. Gives players time to notice and react.</p>
+
+    <h3>Price floors and ceilings</h3>
+<pre><code>price(resource):
+  raw = base_price × supply_factor × demand_factor
+  return clamp(raw, market.floor[resource], market.ceiling[resource])</code></pre>
+
+    <p>The ceiling is the trigger for <strong>emergency import</strong>. When a resource pins against its ceiling too long, city AI imports from other towns. The ceiling <em>is</em> the emergency import threshold — same concept.</p>
+
+    <h3>How transactions hit the market</h3>
+<pre><code>sell(seller, resource, qty):
+  price_at_sale = market.price[resource]
+  payout = price_at_sale × qty
+  market.stock[resource] += qty
+  market.transactions.append(Sale(seller, resource, qty, price_at_sale))
+  seller.gold += payout
+  update_price(resource)
+
+buy(buyer, resource, qty):
+  if market.stock[resource] < qty:
+    market.attempted_purchases[resource] += qty  // track for demand
+    return FAILED_NO_STOCK
+  price_at_sale = market.price[resource]
+  cost = price_at_sale × qty
+  if buyer.gold < cost:
+    market.attempted_purchases[resource] += qty  // wanted, couldn't afford
+    return FAILED_NO_GOLD
+  market.stock[resource] -= qty
+  buyer.gold -= cost
+  seller_payouts_queue.add(resource, qty, cost)
+  update_price(resource)</code></pre>
+
+    <h3>Seller payouts (pro-rata)</h3>
+    <p>Each seller's share of current stock determines their share of payout. Simple, feels fair, works with the abstract market pool:</p>
+
+<pre><code>settle_payout(resource, qty_sold, total_paid):
+  for seller in market.sellers_for(resource):
+    share = seller.stock_in_market / market.total_stock
+    seller.gold += total_paid × share
+    seller.stock_in_market -= qty_sold × share</code></pre>
+
+    <h3>Per-town markets and trade routes</h3>
+    <p>Each town has its own market with independent prices. Price differentials become player opportunity: iron 5g in mining town, 15g in farming town → player hauls iron and profits. This is Guild 2's trade loop.</p>
+
+<pre><code>World:
+  markets: map of TownId → Market
+  trade_routes: list of TradeRoute
+
+TradeRoute:
+  from, to, distance (days), base_tariff (0.2 = 20% markup)</code></pre>
+
+    <p>When Town A runs out of iron, city AI finds Town B with surplus, buys at B's price + tariff + distance, injects at premium (near ceiling). <strong>Player can undercut this</strong> by hauling themselves at cheaper markup.</p>
+
+    <h3>Price discovery for the player</h3>
+    <ol>
+      <li><strong>Current price</strong> — always shown</li>
+      <li><strong>7-day history sparkline</strong> — critical for decisions</li>
+      <li><strong>Inter-town comparison</strong> — only if player visited that town recently (stale data is fine)</li>
+    </ol>
+    <p>The player's knowledge of other towns is N days old. Travel and information become valuable.</p>
+
+    <h3>Edge cases</h3>
+    <ul>
+      <li><strong>Empty market</strong> — pin price to ceiling, keep accumulating demand. First seller back gets the premium.</li>
+      <li><strong>Dumping flood</strong> — stock above normal, price crashes to floor. Moving average distorts upward. Other producers scale back. Market corrects over weeks. Dumper loses money too — realistic.</li>
+      <li><strong>Runaway spiral</strong> — prevent by using smoothed prices for producer decisions, adding NPC price memory, letting production latency absorb swings</li>
+      <li><strong>Currency deflation</strong> — if money drains to sinks faster than it enters, inject via city AI wages, bounties, public works. Monitor total money supply over time.</li>
+    </ul>
+
+    <h3>Tick cadence</h3>
+    <ul>
+      <li><strong>Per transaction</strong>: update stock, record demand, recalc target price</li>
+      <li><strong>Per game-hour</strong>: update smoothed price toward target</li>
+      <li><strong>Daily</strong>: decay old attempted_purchases, clean transaction log</li>
+      <li><strong>Weekly</strong>: recalculate <code>normal_stock</code>, <code>normal_demand</code></li>
+      <li><strong>Monthly</strong>: audit money supply, adjust tax rates</li>
+    </ul>
+
+    <h3>Per-resource tuning</h3>
+    <table>
+      <tr><th>Category</th><th>Consumption</th><th>Durability</th><th>Volume</th><th>Elasticity</th></tr>
+      <tr><td>Food (bread, meat)</td><td>Daily</td><td>Perishable</td><td>High</td><td>Elastic</td></tr>
+      <tr><td>Raw materials (iron, wood)</td><td>Weekly</td><td>Durable</td><td>Medium</td><td>Inelastic</td></tr>
+      <tr><td>Luxury (jewellery, fine swords)</td><td>Rare</td><td>Very durable</td><td>Low</td><td>Inelastic, huge markup</td></tr>
+    </table>
+    <p>Each resource needs its own <code>base_price</code>, <code>normal_days_of_stock</code>, <code>floor</code>, <code>ceiling</code>, possibly own <code>SMOOTHING</code>. Luxuries can swing wildly; staples stay stable. Stick in a data file.</p>
+
+    <div class="callout callout-purple">
+      <div class="callout-label">Build order</div>
+      <p>Pass 1: stock-based supply_factor only. Pass 2: add demand_factor from attempts. Pass 3: add smoothing, floors/ceilings. Pass 4: per-town markets and imports. Pass 5: tune per-resource. Each pass reveals what the next actually needs.</p>
+    </div>
+  </div>
+
+  <hr class="divider"/>
+
+  <!-- ═══════════════════════════════════════════════
+       6. LEGIBILITY
+  ═══════════════════════════════════════════════ -->
+  <div class="section" id="legibility">
+    <div class="section-label">Presentation</div>
+    <h2>Player legibility</h2>
+    <p class="section-desc">The simulation is only as good as the player's ability to read it. Guild 2's biggest criticism was exactly this — stuff happened and you couldn't tell why. Don't repeat that mistake.</p>
+
+    <h3>Three questions to answer at any moment</h3>
+    <ol>
+      <li><strong>What is happening right now?</strong> (state)</li>
+      <li><strong>Why did that happen?</strong> (causation)</li>
+      <li><strong>What's about to happen?</strong> (anticipation)</li>
+    </ol>
+
+    <h3>Layer 1: showing state</h3>
+    <ul>
+      <li><strong>Worker status badges</strong> — icon per NPC: hammering, walking, idle, hungry, sleeping, fleeing</li>
+      <li><strong>Workshop dashboards</strong> — inventory, active tasks, headcount, today's revenue/expenses</li>
+      <li><strong>Market view</strong> — price, stock, 7-day trend sparkline, direction arrow</li>
+      <li><strong>Notification log</strong> — running feed of significant events (trait gains, wage requests, quits, rivals, price ceiling hits)</li>
+    </ul>
+    <p>Notifications must be <strong>short and actionable</strong>. "Hilda gained the Bitter trait" not "An employee has experienced a personality change based on recent conditions."</p>
+
+    <h3>Layer 2: showing causation</h3>
+    <p>The decision log per NPC is the <strong>single most important legibility tool</strong>:</p>
+
+<pre><code>Hilda — Decision log
+  14:22  Claimed: Craft Sword (utility 0.82)
+         Considered: Repair Tools (0.31), Craft Nails (0.54), Eat (0.40)
+         Modifiers: skill_match +0.3, loyal trait +0.15, proximity +0.07
+  13:45  Finished: Gather Iron (3 units)
+  13:20  Claimed: Gather Iron (utility 0.61)</code></pre>
+
+    <p>Doesn't need to be pretty. It just needs to exist. Build this in week one — it's free debugging for you, valuable transparency for players. Show simplified version to players (top 3 considered tasks with scores), keep verbose for debug.</p>
+
+    <ul>
+      <li><strong>Price history with annotations</strong> — mark <em>why</em> on trend lines. "Rival dumped 80 loaves" / "City bulk order" / "Stock depleted." Transforms a graph into a story.</li>
+      <li><strong>Rival observation reports</strong> — after weeks of observation: "Müller bakery: medium size, prioritises volume over quality. Bought a mill last month. Employs 4 workers."</li>
+      <li><strong>Trait effect tooltips</strong> — show <em>what it's currently doing</em>. Not just "Greedy: values money" but "Greedy: currently making Hilda 40% less likely to accept her wage."</li>
+    </ul>
+
+    <h3>Layer 3: showing anticipation</h3>
+    <ul>
+      <li><strong>Need forecasts</strong> — "Workshop runs out of iron in ~2 days at current rate"</li>
+      <li><strong>Price forecasts (soft)</strong> — directional hints only: "Iron supply trending down"</li>
+      <li><strong>Employee risk indicators</strong> — warning icon on any employee likely to quit (wage dissatisfaction, trait conflicts, overworked)</li>
+      <li><strong>Construction progress bars</strong> — "New mine: ready in 3 days"</li>
+      <li><strong>Scheduled events</strong> — tax day approaching, commission due, weekly wage payout total</li>
+    </ul>
+
+    <h3>Transparency / opacity trade-off</h3>
+    <table>
+      <tr><th>Tier</th><th>Examples</th></tr>
+      <tr><td>Always transparent</td><td>Own business state, employee traits/skills, market prices, notifications, own finances</td></tr>
+      <tr><td>Semi-transparent (discovery)</td><td>Rival archetypes (after weeks), other towns' prices (stale), NPC pool availability</td></tr>
+      <tr><td>Opaque</td><td>Rivals' exact finances, rivals' decision scores, raw utility math, city AI's full tree</td></tr>
+    </table>
+    <p>Principle: everything the player could theoretically observe in the game world should eventually be surfaced in UI.</p>
+
+    <h3>Diegetic vs non-diegetic</h3>
+    <p>Guild-style games benefit from <strong>mostly non-diegetic with diegetic flavour touches</strong>. Players are making business decisions — they need fast information access. But scatter diegetic touches (town crier announcing price news, NPCs gossiping about rival expansion) for texture.</p>
+
+    <h3>Attention management</h3>
+    <ul>
+      <li><strong>Red urgent alerts</strong> — immediate action needed. Interrupt. Be conservative.</li>
+      <li><strong>Amber warnings</strong> — act within a day or two. Log + persistent icon.</li>
+      <li><strong>Info notifications</strong> — FYI only. Log, no interruption.</li>
+    </ul>
+    <p>If you cry wolf, players learn to ignore alerts. Red means "stop what you're doing."</p>
+
+    <h3>The "living world" effect</h3>
+    <p>Beyond charts, visualise the simulation:</p>
+    <ul>
+      <li><strong>Crowd flow</strong> — NPCs visibly walking to market when prices are good, queuing when scarce</li>
+      <li><strong>Shop animations</strong> — workers at tasks, full inventory looks full, empty looks empty</li>
+      <li><strong>Town mood</strong> — simple prosperity indicator affecting ambient animations</li>
+      <li><strong>Rival visibility</strong> — when a rival hires an NPC, that NPC visibly walks to their workshop</li>
+    </ul>
+    <p>When the player <em>sees</em> NPCs swarming the bread stall during a price crash, they understand the simulation in their gut.</p>
+
+    <h3>Three tools to build early</h3>
+    <ol>
+      <li><strong>NPC decision log</strong> — why any NPC is doing what. Debug gold, player transparency</li>
+      <li><strong>Price trend graph with annotations</strong> — makes economy visible and teachable</li>
+      <li><strong>Notification log</strong> — player's peripheral attention, low-effort, huge impact on "feels alive"</li>
+    </ol>
+    <p>Build these in month one and everything gets easier. Bugs found faster, tuning faster, playtesters understand faster.</p>
+  </div>
+
+  <hr class="divider"/>
+
+  <div class="callout callout-teal">
+    <div class="callout-label">Next step</div>
+    <p>Start by building the task noticeboard plus one trivial task type (like "gather") and get a single NPC to score and claim tasks. That's the spine — once it works, everything else bolts on.</p>
+  </div>
+
+</div>
+</div>
+<script src="../assets/nav.js"></script>
+</body>
+</html>
