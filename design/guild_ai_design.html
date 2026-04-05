@@ -4,13 +4,15 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Guild — AI Design Document</title>
+  <link rel="stylesheet" href="../assets/theme.css" />
+  <link rel="stylesheet" href="../assets/nav.css" />
   <style>
     body {
       font-family: sans-serif;
-      background: #f9f8f4;
+      background: var(--bg);
       margin: 0;
       padding: 48px 16px;
-      color: #2C2C2A;
+      color: var(--text);
       line-height: 1.65;
     }
     .page {
@@ -20,23 +22,23 @@
     h1 {
       font-size: 24px;
       font-weight: 500;
-      color: #2C2C2A;
+      color: var(--text);
       margin: 0 0 6px 0;
     }
     .subtitle {
       font-size: 13px;
-      color: #888780;
+      color: var(--muted);
       margin-bottom: 8px;
     }
     .meta {
       font-size: 11px;
-      color: #b4b2a9;
+      color: var(--muted);
       letter-spacing: 0.05em;
       margin-bottom: 40px;
     }
     .toc {
-      background: #ffffff;
-      border: 1px solid #e8e6df;
+      background: var(--panel);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 20px 24px;
       margin-bottom: 48px;
@@ -45,7 +47,7 @@
       font-size: 10px;
       font-weight: 500;
       letter-spacing: 0.1em;
-      color: #888780;
+      color: var(--muted);
       text-transform: uppercase;
       margin-bottom: 12px;
     }
@@ -56,14 +58,14 @@
     }
     .toc li {
       margin-bottom: 6px;
-      color: #444441;
+      color: var(--text);
     }
     .toc a {
-      color: #444441;
+      color: var(--text);
       text-decoration: none;
     }
     .toc a:hover {
-      color: #534AB7;
+      color: var(--link);
       text-decoration: underline;
     }
     .section {
@@ -73,42 +75,42 @@
       font-size: 10px;
       font-weight: 500;
       letter-spacing: 0.1em;
-      color: #888780;
+      color: var(--muted);
       text-transform: uppercase;
       margin-bottom: 6px;
     }
     h2 {
       font-size: 20px;
       font-weight: 500;
-      color: #2C2C2A;
+      color: var(--text);
       margin: 0 0 6px 0;
       scroll-margin-top: 24px;
     }
     .section-desc {
       font-size: 13px;
-      color: #888780;
+      color: var(--muted);
       margin-bottom: 24px;
     }
     h3 {
       font-size: 16px;
       font-weight: 500;
-      color: #3C3489;
+      color: var(--text);
       margin: 32px 0 10px 0;
     }
     h4 {
       font-size: 14px;
       font-weight: 500;
-      color: #2C2C2A;
+      color: var(--text);
       margin: 20px 0 8px 0;
     }
     p {
       font-size: 14px;
-      color: #444441;
+      color: var(--text);
       margin: 0 0 12px 0;
     }
     ul, ol {
       font-size: 14px;
-      color: #444441;
+      color: var(--text);
       margin: 0 0 12px 0;
       padding-left: 22px;
     }
@@ -117,26 +119,26 @@
     }
     strong {
       font-weight: 500;
-      color: #2C2C2A;
+      color: var(--text);
     }
     code {
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px;
-      background: #f1efe8;
+      background: rgba(0, 0, 0, 0.1);
       padding: 1px 5px;
       border-radius: 3px;
-      color: #633806;
+      color: var(--text);
     }
     pre {
-      background: #ffffff;
-      border: 1px solid #e8e6df;
+      background: var(--panel);
+      border: 1px solid var(--border);
       border-radius: 8px;
       padding: 14px 16px;
       overflow-x: auto;
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       font-size: 12px;
       line-height: 1.55;
-      color: #444441;
+      color: var(--text);
       margin: 12px 0 16px 0;
     }
     pre code {
@@ -146,8 +148,8 @@
       font-size: inherit;
     }
     .callout {
-      background: #ffffff;
-      border: 1px solid #e8e6df;
+      background: var(--panel);
+      border: 1px solid var(--border);
       border-radius: 8px;
       padding: 14px 18px;
       margin: 16px 0;
@@ -170,26 +172,26 @@
     .callout p:last-child { margin-bottom: 0; }
     .divider {
       border: none;
-      border-top: 1px solid #e8e6df;
+      border-top: 1px solid var(--border);
       margin: 48px 0;
     }
     .diagram {
-      background: #ffffff;
-      border: 1px solid #e8e6df;
+      background: var(--panel);
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 24px 16px;
       margin: 20px 0 24px 0;
     }
-    .th      { font-size: 14px; font-weight: 500; fill: #3C3489; }
-    .ts      { font-size: 12px; font-weight: 400; fill: #534AB7; }
-    .th-teal { font-size: 14px; font-weight: 500; fill: #085041; }
-    .ts-teal { font-size: 12px; font-weight: 400; fill: #0F6E56; }
-    .th-amber{ font-size: 14px; font-weight: 500; fill: #633806; }
-    .ts-amber{ font-size: 12px; font-weight: 400; fill: #854F0B; }
-    .th-coral{ font-size: 14px; font-weight: 500; fill: #712B13; }
-    .ts-coral{ font-size: 12px; font-weight: 400; fill: #993C1D; }
-    .th-gray { font-size: 14px; font-weight: 500; fill: #444441; }
-    .label   { font-size: 10px; fill: #888780; letter-spacing: 0.05em; }
+    .th      { font-size: 14px; font-weight: 500; fill: #111110; }
+    .ts      { font-size: 12px; font-weight: 400; fill: #111110; }
+    .th-teal { font-size: 14px; font-weight: 500; fill: #111110; }
+    .ts-teal { font-size: 12px; font-weight: 400; fill: #111110; }
+    .th-amber{ font-size: 14px; font-weight: 500; fill: #111110; }
+    .ts-amber{ font-size: 12px; font-weight: 400; fill: #111110; }
+    .th-coral{ font-size: 14px; font-weight: 500; fill: #111110; }
+    .ts-coral{ font-size: 12px; font-weight: 400; fill: #111110; }
+    .th-gray { font-size: 14px; font-weight: 500; fill: #111110; }
+    .label   { font-size: 10px; fill: #555552; letter-spacing: 0.05em; }
     table {
       width: 100%;
       border-collapse: collapse;
@@ -199,20 +201,19 @@
     th, td {
       text-align: left;
       padding: 8px 12px;
-      border-bottom: 1px solid #e8e6df;
-      color: #444441;
+      border-bottom: 1px solid var(--border);
+      color: var(--text);
     }
     th {
       font-weight: 500;
-      color: #2C2C2A;
-      background: #ffffff;
+      color: var(--text);
+      background: var(--panel);
       font-size: 12px;
     }
     td code {
       font-size: 11px;
     }
   </style>
-  <link rel="stylesheet" href="../assets/nav.css" />
 </head>
 <body>
 <div id="content">
