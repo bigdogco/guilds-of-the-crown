@@ -15,6 +15,7 @@
         { label: 'Economic Diagrams', href: 'design/guild_economic_loop_detailed.html' },
         { label: 'Time Model',        href: 'design/guild_time_model.html' },
         { label: 'AI Design',         href: 'design/guild_ai_design.html' },
+         { label: 'UI Kit',            href: 'design/guild_ui_kit.html' },
       ]
     },
   ];
