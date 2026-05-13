@@ -1,0 +1,516 @@
+================================================================================
+  TASK NOTICEBOARD SYSTEM  -  Design & Implementation Notes
+  Updated: May 2026
+    - per-owner NoticeboardComponent, city public board
+    - Craft task type + CraftStepSystem (see task_crafting.txt for details)
+    - Workshop / GatheringSpot / Building system split into separate files
+    - Sell task type + PickupStepSystem + SellStepSystem (see task_selling.txt)
+    - DeliverStep / PickupStep gained dual-id target (Tiled object OR GameEntity)
+    - Gold migrated to a real DB item (items/currency/gold); marketplaces use
+      UnlimitedGoldComponent; dynasty receives sale proceeds via DeliverStep
+    - ReturnGoods task type + TaskFailureRecoverySystem: failed Sell tasks
+      post a follow-up task onto the worker's PERSONAL board so unsold items
+      don't get stuck in their inventory.  First real producer for per-character
+      noticeboards (see task_selling.txt §10).
+================================================================================
+
+1.  PURPOSE
+--------------------------------------------------------------------------------
+A task system that lets characters autonomously claim and execute multi-step
+work tasks.  Tasks are produced by workshop systems and the dynasty system;
+a per-owner noticeboard component controls which tasks each board holds, and
+TaskClaimSystem filters by board membership before claiming.
+
+
+2.  ARCHITECTURE OVERVIEW
+--------------------------------------------------------------------------------
+
+  +---------------------+    on_construct<TaskComponent>   +--------------------+
+  | Task producers      | -------------------------------->| NoticeboardSystem  |
+  | AlchemyShopSystem   |                                  | (priority 5)       |
+  | CarpenterShopSystem |    on_destroy<TaskComponent>     |                    |
+  | DynastySystem       | -------------------------------->| Routes task to the |
+  +---------------------+                                  | correct board:     |
+                                                           |  Hire  -> city     |
+                                                           |  Work  -> workshop |
+                                                           +--------------------+
+                                                                    |
+                                                  NoticeboardComponent.postedTasks
+                                                           |
+                                          +----------------+----------------+
+                                          |                                 |
+                                   City board                    Workshop board(s)
+                                (public: Hire tasks)          (private: work tasks)
+                                          |                                 |
+                                          +----------------+----------------+
+                                                           |
+                                                    TaskClaimSystem
+                                                    Phase B: walk relevant
+                                                    boards per character
+                                                           |
+                                                  CurrentTaskComponent
+                                                           |
+                                              +-----------+-----------+
+                                              |           |           |
+                                              v           v           v
+                                       MoveToStep   GatherStep  DeliverStep
+                                       System(17)   System(18)  System(19)
+                                              |           |           |
+                                       MoveGoal   accumulate    transfer
+                                              |    inventory   to building
+                                              v
+                                     PathfindingSystem(16)
+                                              |
+                                       MoveResult signal
+                                              |
+                                              v
+                                       MoveToStepSystem
+                                       advances to next step
+                                              |
+                                     (all steps done)
+                                              |
+                                              v
+                                       task.state = Done
+                                              |
+                                              v
+                                    TaskCleanupSystem(20)
+                                    destroys terminal tasks
+
+
+3.  KEY CONCEPTS
+--------------------------------------------------------------------------------
+
+3.1  Task entities
+
+  A task entity always has exactly two components:
+    - TaskComponent         shared metadata (id, state, claimed/posted by, timestamps)
+    - TaskStepsComponent    ordered list of TaskStep variants to execute
+
+  Task entities also carry GameEntityComponent for a stable PackedId used in
+  logs and save/load.  They have no TransformComponent or visual presence.
+
+3.2  Task types
+
+  MoveTo    single-step: walk to a tile.  Used internally / for testing.
+  Gather    4-step: walk to spot -> gather -> walk to workshop -> deliver.
+  Hire      1-step: walk to a dynasty workshop.  Arrival = employment.
+  Craft     2-step: walk to workshop -> craft items in place.
+            Posted by workshop systems when materials are stocked above the
+            craft threshold (see task_crafting.txt).
+  Sell      6-step: workshop -> pickup -> marketplace -> sell -> workshop ->
+            deposit gold into the owning dynasty.  Posted by workshop systems
+            when a crafted item stack reaches its stackLimit (see task_selling.txt).
+  ReturnGoods
+            2-step: walk to workshop -> deliver every item from worker
+            inventory.  Posted by TaskFailureRecoverySystem when a Sell task
+            fails, onto the worker's PERSONAL noticeboard.  postedBy is the
+            worker entity itself.
+
+3.3  Task states
+
+    Posted      visible on the noticeboard, available for claiming
+    Claimed     reserved by a character, not yet executing
+    InProgress  character is actively executing the current step
+    Done        all steps completed successfully (terminal)
+    Failed      could not complete — path blocked, cancelled (terminal)
+
+  Terminal states are cleaned up by TaskCleanupSystem (priority 20).
+
+3.4  TaskStepsComponent
+
+  Holds a std::vector<TaskStep>, where TaskStep is a std::variant of:
+    MoveToStep    { destination: Spark::Point }
+    GatherStep    { spot, spotId, itemType, gatheringSpeed, targetQuantity, ... }
+    DeliverStep   { target, targetObjectId, targetGameId, itemType, quantity }
+    PickupStep    { source, sourceObjectId, sourceGameId, itemType, quantity }
+    SellStep      { buyer, buyerObjectId, itemType, quantity, pricePerUnit }
+    CraftStep     { itemType, craftHoursPerItem, accumulator, crafted,
+                    workshop, workshopObjectId }
+
+  DeliverStep and PickupStep use the dual-id pattern: exactly one of
+  *ObjectId (Tiled GUID) or *GameId (id_index of GameEntityComponent.id) is
+  non-zero per step.  This lets a single step type deliver to / pick up from
+  either a Tiled building or a runtime GameEntity (dynasty, city, ...).
+  The PickupStep GameEntity branch is reserved — no producer uses it yet.
+
+  The component tracks currentStep index and stepStarted flag.
+  Advance() increments currentStep and resets stepStarted so the next
+  step executor picks up on the same tick.
+
+  Step systems self-select via std::get_if<StepType>(&stepsComp->Current()).
+  A system that does not own the current step type simply skips the entity.
+
+3.5  NoticeboardComponent  (replaces the old global TaskNoticeboard)
+
+  A component — not a global service — attached to any entity that owns tasks.
+  Current owners:
+    Workshop entity     private board; holds Gather+Deliver work tasks
+    City entity         public board; holds Hire tasks from all workshops
+    (Dynasty / character boards reserved for future use)
+
+  Fields:
+    postedTasks   std::vector<entt::entity>   runtime handles to task entities
+
+  Runtime-only.  Not serialised; rebuilt from scratch after load via
+  NoticeboardSystem::RebuildAllBoards().
+
+3.6  NoticeboardSystem  (priority 5)
+
+  Owns all routing logic — task producers never touch boards directly.
+
+  Signal hooks:
+    on_construct<TaskComponent>  -> OnTaskConstructed
+      Reads the new task's type, calls ResolveBoardOwner(), adds the task
+      entity to the resolved board's postedTasks list.
+      If postedBy is null (early load path, before resolve), bails out —
+      RebuildAllBoards() will pick it up after the resolve pass.
+
+    on_destroy<TaskComponent>    -> OnTaskDestroyed
+      Reads postedBy (safe — on_destroy fires before removal), calls
+      ResolveBoardOwner(), swap-removes the task from the board's list.
+
+  Routing rule (ResolveBoardOwner):
+    Hire tasks  -> city entity (if a city entity exists)
+    All others  -> task.postedBy  (the workshop that posted it)
+    Fallback    -> task.postedBy  (if no city entity exists yet)
+
+  This means postedBy is always the workshop, even for Hire tasks.
+  The board is just where the task is visible; postedBy stays consistent
+  for pendingHires counting, DynastySystem assignment, and save/load.
+
+  Post-load rebuild:
+    RebuildAllBoards(registry) clears all board lists, then re-routes every
+    task through ResolveBoardOwner.  Called by TilemapWorld after the full
+    postedBy resolve pass.
+
+3.7  City entity
+
+  A singleton entity representing the city.  Created at map load time.
+  Carries: CityComponent, GameEntityComponent, NoticeboardComponent,
+           CityInitComponent (init tag).
+
+  CitySystem (priority 6) hooks on_construct<CityComponent> to ensure the
+  city always gets a GameEntityComponent and a NoticeboardComponent when the
+  component is first attached.
+
+  The city board is the public noticeboard: any character can see tasks on
+  it regardless of dynasty or employment status.  Currently holds only Hire
+  tasks; other public task types can be added later.
+
+3.8  CurrentTaskComponent
+
+  Attached to a character when it claims a task.  Contains:
+    task    entt::entity  runtime handle to the task entity
+    taskId  PackedId      id_index of the task's GameEntityComponent.id
+                          (used to re-resolve task entity after a save/load)
+
+  Characters without CurrentTaskComponent are idle and eligible for claiming.
+  Removed by TaskCleanupSystem after the task entity is destroyed.
+
+
+4.  TASK CLAIMING — BOARD VISIBILITY AND ELIGIBILITY
+--------------------------------------------------------------------------------
+
+TaskClaimSystem Phase B walks the boards relevant to each character and
+applies a single employment filter:
+
+  Free agent (no WorkshopWorkerComponent):
+    - Reads the city's public board (Hire tasks only).
+    - All Hire tasks are eligible.
+    - Cannot see workshop private boards.
+
+  Workshop worker (has WorkshopWorkerComponent):
+    - Reads the city board AND their workshop's private board.
+    - Hire tasks are skipped (already employed).
+    - May claim Gather+Deliver tasks posted by their own workshop.
+
+Board-walking order per character:
+  1. City board  (public)
+  2. Own workshop's board (if WorkshopWorkerComponent present)
+
+For each candidate task the character adds it to a scored set; the nearest
+(lowest-cost) eligible task is claimed.
+
+
+5.  TASK PRODUCERS
+--------------------------------------------------------------------------------
+
+5.1  AlchemyShopSystem (priority 11) / CarpenterShopSystem (priority 12)
+
+  Shared implementation via file-local PostWorkshopTasks<TShop, TSpot, ...>
+  template (see WorkshopSystems.cpp).
+
+  Per dynasty-owned workshop each spawn interval:
+
+  Hire tasks:
+    - openHireSlots = maxWorkers - workerCount - pendingHires
+    - pendingHires  = non-terminal tasks where postedBy == workshopEntity
+                      AND type == Hire  (postedBy is always the workshop,
+                      even though NoticeboardSystem routes the task to the
+                      city board)
+    - One Hire task per open slot.  postedBy = workshopEntity.
+    - NoticeboardSystem routes these to the city's public board automatically.
+
+  Work tasks (Sell OR Craft OR Gather+Deliver — one per free worker slot):
+    - workTasksToPost = workerCount - activeWorkTasks
+    - Decision order per free slot:
+        1. Sell phase   - any crafted-item stack >= stackLimit?  Post a 6-step
+                          Sell task (workshop -> marketplace -> dynasty).
+                          See task_selling.txt.
+        2. Craft phase  - any craftable with full materials >= 50?  Post Craft.
+                          See task_crafting.txt.
+        3. Gather phase - fallback: post Gather+Deliver.
+    - postedBy = workshopEntity; visible only on the workshop's private board.
+
+  No MAX_TASKS_PER_WORKSHOP cap — the slot counts above bound task creation
+  naturally.
+
+5.2  DynastySystem (priority 19) — Phase C
+
+  For each dynasty with open member slots (maxMembers - members - pendingHires > 0):
+    Post one TaskType::Hire task per open slot, cycling through the dynasty's
+    owned workshops.  Each hire task is a single MoveToStep pointing at the
+    workshop tile.  Arriving at the workshop = hired (Phase B finalises
+    membership).
+
+
+6.  STEP SYSTEMS
+--------------------------------------------------------------------------------
+
+  MoveToStepSystem  (priority 17)
+    Detects MoveToStep as current step.  On stepStarted=false, emplaces
+    MoveGoalComponent on the character.  On MoveResultComponent signal
+    (via on_construct callback): Arrived -> Advance() to next step;
+    Blocked/Cancelled -> task.state = Failed.
+
+  GatherStepSystem  (priority 18)
+    Detects GatherStep as current step.  Each tick, increments an accumulator
+    by gatheringSpeed.  Whole items are added to the character's inventory.
+    When gathered >= targetQuantity, Advance() to next step.
+
+  DeliverStepSystem  (priority 19)
+    Detects DeliverStep as current step.  One-shot (stepStarted guard):
+    transfers all matching items from character inventory to the target's
+    InventoryComponent.  Target can be a Tiled building (targetObjectId) or
+    a GameEntity (targetGameId, e.g. dynasty, city).  Lazy-resolves the
+    runtime handle from whichever id is non-zero.  If the target is invalid
+    or has no InventoryComponent, task.state = Failed.
+
+  PickupStepSystem  (priority 19)
+    Mirror of DeliverStepSystem — items flow source -> worker.  One-shot.
+    Source can be a Tiled building (sourceObjectId) or a GameEntity
+    (sourceGameId — reserved, no producer yet).  Fails the task if the source
+    is short of the requested quantity (worker can't proceed with partial
+    pickup).  See task_selling.txt.
+
+  SellStepSystem  (priority 19)
+    Detects SellStep as current step.  One-shot atomic exchange at the buyer:
+      pre-check (worker has items, buyer can pay)
+      commit   (deduct gold, deduct items worker, add items buyer, add gold worker)
+    UnlimitedGoldComponent on the buyer skips the gold deduction (marketplace
+    pays from thin air).  Pre-check failure -> task.state = Failed, no mutation.
+    See task_selling.txt.
+
+  TaskFailureRecoverySystem  (priority 14)
+    Not a step executor — sits between SellStepSystem (19) and TaskCleanupSystem
+    (20) by way of on_destroy<TaskComponent>.
+      Phase 1 (signal): captures the worker entity from a Failed Sell task
+                        into a pending queue.
+      Phase 2 (Update): next tick, posts a ReturnGoods task onto the worker's
+                        personal noticeboard so the items don't get stuck.
+    Priority 14 ensures the Update runs BEFORE TaskClaimSystem (15) the
+    following tick, so the worker can immediately pick the recovery task up.
+    See task_selling.txt §10 for the full walkthrough and policy decisions.
+
+  CraftStepSystem  (priority 16, Minute frequency)
+    Detects CraftStep as current step.  Once per game minute, accumulates
+    progress at itemsPerMinute = (handcraft * 0.1) / (craftHoursPerItem * 60).
+    When the accumulator passes 1.0, deducts whole-number materials from the
+    workshop inventory and adds the crafted item.  When materials run out,
+    task.state = Done so the workshop can re-evaluate next minute.
+    See task_crafting.txt for full details.
+
+
+7.  SAVE / LOAD
+--------------------------------------------------------------------------------
+
+  TaskComponent fields and their persistence:
+
+    id              PackedId   StableId — used for logging only; not serialised.
+    type            uint8      Serialised (task_type tag).
+    state           uint8      Serialised (task_state tag).
+    claimedBy       entity     NOT serialised (runtime handle).
+    claimedById     PackedId   Serialised (claimed_by_id tag).
+                               Stored as id_index() — generation bits stripped.
+    postedBy        entity     NOT serialised (runtime handle).
+    postedById      int        Serialised (posted_by_id tag).
+                               Tiled GUID of the ObjectEntity poster (workshop).
+                               Plain int — never cast to/from PackedId.
+    postedByGameId  PackedId   Serialised (posted_by_game_id tag).
+                               id_index of the GameEntityComponent.id poster
+                               (city, dynasty).  Exactly one of postedById /
+                               postedByGameId is non-zero per task.
+    postedAt        uint64     Serialised (posted_at tag).
+    claimedAt       uint64     Serialised (claimed_at tag).
+
+  Post-load postedBy resolve (TilemapWorld::LoadEntities):
+    if postedById != 0:
+      resolve via tilemap->GetObjectById(postedById)->getEntityId()
+    else if postedByGameId != 0:
+      resolve via FindGameEntityById(postedByGameId)
+    After all tasks are resolved, call NoticeboardSystem::RebuildAllBoards().
+
+  CurrentTaskComponent:
+    task            entity     NOT serialised.
+    taskId          PackedId   Serialised (task_id tag).
+                               Used by TilemapWorld::LoadEntities to re-resolve
+                               the task entity handle after load.
+
+  TaskStepsComponent (per-step fields):
+    spot / target / source / buyer / workshop   entity   NOT serialised (runtime handles).
+    spotId          PackedId   Serialised. id_index(WorldEntityComponent.id) of GatherStep.spot.
+    targetObjectId  int        Serialised. Tiled GUID for DeliverStep target buildings.
+    targetGameId    PackedId   Serialised. id_index of DeliverStep GameEntity targets
+                               (dynasty, city, ...).  Exactly one of targetObjectId
+                               / targetGameId is non-zero.
+    sourceObjectId  int        Serialised. Tiled GUID for PickupStep source buildings.
+    sourceGameId    PackedId   Serialised. id_index for PickupStep GameEntity sources
+                               (reserved, no producer yet).
+    buyerObjectId   int        Serialised. Tiled GUID for SellStep buyers (marketplace).
+    workshopObjectId int       Serialised. Tiled GUID for CraftStep workshops.
+    currentStep     int        Serialised.
+    stepStarted     bool       Serialised.
+    accumulator     float      Serialised (GatherStep + CraftStep).
+    pricePerUnit    int        Serialised (SellStep).
+    craftHoursPerItem float    Serialised (CraftStep).
+
+  NoticeboardComponent is NOT serialised — it is rebuilt from TaskComponents
+  after load by NoticeboardSystem::RebuildAllBoards().
+
+
+8.  MOVERESULT — SIGNAL-DRIVEN MOVEMENT COMPLETION
+--------------------------------------------------------------------------------
+
+Completion of a MoveToStep is driven by signals, not polling:
+
+  1. PathfindingSystem emplaces MoveResultComponent on the character when
+     movement reaches a terminal outcome (Arrived, Blocked, Cancelled).
+
+  2. MoveToStepSystem hooks on_construct<MoveResultComponent>.  The callback
+     is lightweight — it only pushes the character entity into a pending queue.
+     No state transitions happen inside the callback.
+
+  3. On the next tick, MoveToStepSystem drains the queue, reads MoveResult,
+     and either advances to the next step (Arrived) or fails the task (Blocked/
+     Cancelled).
+
+MoveResult is cleared (removed) by PathfindingSystem when a new MoveGoalComponent
+is accepted, so stale results from previous movement never interfere.
+
+
+9.  SYSTEM EXECUTION ORDER
+--------------------------------------------------------------------------------
+
+See task_system_priority.txt for the full priority table.  Summary relevant
+to task flow:
+
+   5  NoticeboardSystem     routes tasks to boards via on_construct/on_destroy signals
+   6  CitySystem            ensures city entity has GameEntityComponent + NoticeboardComponent
+  11  AlchemyShopSystem     posts Hire + Sell / Craft / Gather+Deliver tasks (dynasty-owned only)
+  12  CarpenterShopSystem   posts Hire + Sell / Craft / Gather+Deliver tasks (dynasty-owned only)
+  14  TaskFailureRecoverySystem  on_destroy captures Failed Sell tasks; Update posts ReturnGoods
+  15  TaskClaimSystem       idle characters claim nearest eligible task
+  16  PathfindingSystem     runs A* for MoveGoalComponent
+  16  CraftStepSystem       drives CraftStep on Minute tick; produces items
+  17  MoveToStepSystem      drives MoveToStep; advances on MoveResult signal
+  18  GatherStepSystem      drives GatherStep; accumulates items
+  19  DeliverStepSystem     drives DeliverStep; transfers items (Tiled or GameEntity target)
+  19  PickupStepSystem      drives PickupStep; transfers items (Tiled or GameEntity source)
+  19  SellStepSystem        drives SellStep; atomic items<->gold exchange at buyer
+  19  DynastySystem         finalises Hire-task membership; posts new Hire tasks
+  20  TaskCleanupSystem     destroys Done/Failed tasks; removes CurrentTaskComponent
+
+
+10. FILE INVENTORY
+--------------------------------------------------------------------------------
+
+  Core task files:
+    Esc/Components/TaskComponents.h         TaskComponent, TaskStepsComponent,
+                                            step structs (MoveTo / Gather /
+                                            Deliver / Craft), state/type enums,
+                                            CurrentTaskComponent, serialisers
+    Esc/Components/NoticeboardComponents.h  NoticeboardComponent (runtime-only)
+    Esc/Systems/NoticeboardSystem.h/.cpp    Signal hooks; ResolveBoardOwner;
+                                            RebuildAllBoards
+    Esc/Systems/TaskClaimSystem.h/.cpp      Claim phase + InProgress transition
+    Esc/Systems/MoveToStepSystem.h/.cpp     Drives MoveToStep; MoveResult signal hook
+    Esc/Systems/GatherStepSystem.h/.cpp     Drives GatherStep
+    Esc/Systems/DeliverStepSystem.h/.cpp    Drives DeliverStep (Tiled or GameEntity target)
+    Esc/Systems/PickupStepSystem.h/.cpp     Drives PickupStep (mirror of DeliverStep)
+    Esc/Systems/SellStepSystem.h/.cpp       Drives SellStep (atomic items<->gold exchange)
+    Esc/Systems/CraftStepSystem.h/.cpp      Drives CraftStep (Minute frequency)
+    Esc/Systems/TaskFailureRecoverySystem.h/.cpp
+                                            on_destroy capture + queue-drain
+                                            Update; posts ReturnGoods recovery
+                                            tasks for failed Sell tasks.
+                                            Log channel: esc.recovery
+    Esc/Systems/TaskCleanupSystem.h/.cpp    Destroys terminal tasks
+
+  Item / currency:
+    Esc/Components/ItemComponents.h         InventoryComponent, ItemStack,
+                                            UnlimitedGoldComponent (tag)
+    Esc/Systems/ItemUtils.h                 Add/Get/TryDeductItem helpers +
+                                            gold-specific shortcuts honoring
+                                            UnlimitedGoldComponent.
+                                            DB::items::currency::gold path.
+
+  Marketplace:
+    Esc/Components/MarketplaceComponents.h  MarketplaceComponent (marker)
+    Esc/Systems/MarketplaceSystems.h/.cpp   On construction: emplaces
+                                            InventoryComponent + Transform +
+                                            UnlimitedGoldComponent.
+
+  City:
+    Esc/Components/CityComponents.h         CityComponent, CityInitComponent
+    Esc/Systems/CitySystems.h/.cpp          CitySystem (ensures GameEntity + board)
+
+  Task producers:
+    Esc/Systems/BuildingSystems.h/.cpp      Generic building lifecycle:
+                                            BuildingSystem, HouseSystem,
+                                            BuildingUpgradeSystem
+    Esc/Systems/WorkshopSystems.h/.cpp      AlchemyShopSystem +
+                                            CarpenterShopSystem; PostWorkshopTasks
+                                            template posts Hire / Craft / Gather
+                                            tasks per worker slot
+    Esc/Systems/GatheringSpotSystem.h/.cpp  GatheringSpotSystem (init pass for
+                                            Berry / Wood gathering spots)
+    Esc/Systems/BuildingUtils.h             Header-only helpers shared by
+                                            workshop / marketplace code:
+                                            CRAFT_MATERIAL_THRESHOLD,
+                                            CraftItemData, ReadCraftItemData,
+                                            HasMaterialsAboveThreshold
+    Esc/Systems/DynastySystems.h/.cpp       DynastySystem (Hire tasks, Phase C)
+
+  Crafting data:
+    Esc/Components/BuildingComponents.h     WorkshopCraftingComponent (runtime
+                                            list of craftable item DB paths;
+                                            populated by SetupBuildingLevelData)
+
+  Employment components (board visibility):
+    Esc/Components/BasicComponents.h        WorkshopWorkerComponent (workshopId: int)
+    Esc/Components/DynastyComponents.h      DynastyComponent, DynastyMemberComponent,
+                                            DynastyWorkshopComponent, DynastyInitComponent
+
+
+11. WHAT IS NOT BUILT YET
+--------------------------------------------------------------------------------
+
+  - Dynasty noticeboards.  Structure exists; no producers yet.
+  - Personal noticeboards now have one producer (TaskFailureRecoverySystem
+    posts ReturnGoods tasks onto them).  Other planned uses: eat/sleep tasks
+    when the worker is idle, "drop loot at home" tasks for adventurers, etc.
+  - Utility scoring (trait/skill modifiers, preference weights)
+  - Task timeouts or reservation expiry
+  - Team tasks (multi-NPC coordination)
+  - UI for decision logs (console logging only)
+  - Multiple city support (currently assumes singleton city entity)

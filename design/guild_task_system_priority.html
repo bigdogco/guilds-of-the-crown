@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guild — System Execution Priority</title>
+  <link rel="stylesheet" href="../assets/theme.css" />
+  <link rel="stylesheet" href="../assets/nav.css" />
+  <style>
+    body { font-family: sans-serif; background: var(--bg); margin: 0; padding: 48px 16px; color: var(--text); line-height: 1.65; }
+    .page { max-width: 960px; margin: 0 auto; }
+    h1 { font-size: 22px; font-weight: 500; color: var(--text); margin: 0 0 6px 0; }
+    .subtitle { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+    .meta { font-size: 11px; color: var(--muted); letter-spacing: 0.05em; margin-bottom: 40px; }
+    .section { margin-bottom: 48px; }
+    .section-label { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
+    h2 { font-size: 18px; font-weight: 500; color: var(--text); margin: 0 0 6px 0; scroll-margin-top: 24px; }
+    h3 { font-size: 15px; font-weight: 500; color: var(--text); margin: 24px 0 8px 0; }
+    p { font-size: 13px; color: var(--text); margin: 0 0 10px 0; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px 0; font-size: 13px; }
+    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text); }
+    th { font-weight: 500; background: var(--panel); }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: rgba(0,0,0,0.1); padding: 1px 5px; border-radius: 3px; color: var(--text); }
+    .callout { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; margin: 16px 0; }
+    .callout-purple { border-left: 3px solid #534AB7; border-radius: 0 8px 8px 0; }
+    .callout-teal { border-left: 3px solid #0F6E56; border-radius: 0 8px 8px 0; }
+    .callout-amber { border-left: 3px solid #854F0B; border-radius: 0 8px 8px 0; }
+    .callout-label { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+    .callout-purple .callout-label { color: #534AB7; }
+    .callout-teal .callout-label { color: #0F6E56; }
+    .callout-amber .callout-label { color: #854F0B; }
+    ul, ol { font-size: 13px; color: var(--text); margin: 0 0 12px 0; padding-left: 22px; }
+    li { margin-bottom: 4px; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+  </style>
+</head>
+<body>
+<div id="content">
+<div class="page">
+
+  <h1>System Execution Priority Reference</h1>
+  <p class="subtitle">Lower number = runs first. All systems use Tick frequency unless noted.</p>
+  <p class="meta">REFERENCE · SYSTEM PRIORITIES</p>
+
+  <div class="section">
+    <h2>System Priority Table</h2>
+    <table>
+      <thead>
+        <tr><th>Priority</th><th>System</th><th>Frequency</th><th>Notes</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>0</td><td>MarketplaceSystem</td><td>Tick</td><td>Stub; emplaces InventoryComponent and TransformComponent on construction. Update is empty (consumption/restocking not built yet).</td></tr>
+        <tr><td rowspan="2">9</td><td>BuildingSystem</td><td>Tick</td><td>Generic building init; on_construct for all building types. Adds InventoryComponent to every building. SetupBuildingLevelData also emplaces/refreshes WorkshopCraftingComponent for any level that lists craft_items.</td></tr>
+        <tr><td>GatheringSpotSystem</td><td>Tick</td><td>Also priority 9. Resolves GatheringSpotInitComponent (sets name/itemType/gatheringSpeed from DB). Lives in its own file.</td></tr>
+        <tr><td rowspan="3">10</td><td>HouseSystem</td><td>Tick</td><td>House-specific logic.</td></tr>
+        <tr><td>BuildingUpgradeSystem</td><td>Tick</td><td>Also priority 10. Handles level-up transitions.</td></tr>
+        <tr><td>InventorySystem</td><td>Tick</td><td>Also priority 10. Item/inventory bookkeeping.</td></tr>
+        <tr><td></td><td>GroundItemSystem</td><td>Tick</td><td>Also priority 10. Dropped item handling.</td></tr>
+        <tr><td>11</td><td>AlchemyShopSystem</td><td>Tick</td><td>Posts Hire + Sell / Craft / Gather+Deliver tasks (berry resources, alchemy crafted goods). Per worker slot: Sell &rarr; Craft &rarr; Gather fallback. Only posts if workshop has DynastyWorkshopComponent.</td></tr>
+        <tr><td>12</td><td>CarpenterShopSystem</td><td>Tick</td><td>Posts Hire + Sell / Craft / Gather+Deliver tasks (wood resources, carpenter crafted goods). Same logic as AlchemyShopSystem. Only posts if workshop has DynastyWorkshopComponent.</td></tr>
+        <tr><td>13</td><td>StepTagRebuildSystem</td><td>Tick</td><td>Post-load tag recovery. Views characters with CurrentTaskComponent but none of the six ActiveTags. On normal ticks that excluded-tag view is empty — near-zero cost. On the first tick after a save load it finds all InProgress characters missing their tags and calls ApplyStepTag for each. Must run before TaskClaimSystem (15).</td></tr>
+        <tr><td>14</td><td>TaskFailureRecoverySystem</td><td>Tick</td><td>Hooks on_destroy&lt;TaskComponent&gt;. Failed Sell tasks push the worker entity into a pending queue. Update drains the queue and posts ReturnGoods tasks onto the worker's personal noticeboard. Priority 14 guarantees Update runs BEFORE TaskClaim (15) the tick after the failure. Log channel: esc.recovery.</td></tr>
+        <tr><td>15</td><td>TaskClaimSystem</td><td>Tick</td><td>Phase A: spawns test tasks. Phase B: idle characters claim nearest Posted task. Phase C: advances Claimed tasks to InProgress.</td></tr>
+        <tr><td rowspan="2">16</td><td>PathfindingSystem</td><td>Tick</td><td>Picks up MoveGoalComponent; runs A* and emits path.</td></tr>
+        <tr><td>CraftStepSystem</td><td>Minute</td><td>Also priority 16 (Minute frequency). Executes CraftStep — each minute accumulates progress; deducts materials and adds crafted item when accumulator passes 1.0.</td></tr>
+        <tr><td>17</td><td>MoveToStepSystem</td><td>Tick</td><td>Executes MoveToStep — emplaces MoveGoalComponent on step start, advances/fails on MoveResultComponent signal.</td></tr>
+        <tr><td>18</td><td>GatherStepSystem</td><td>Tick</td><td>Executes GatherStep — accumulates items into character inventory at gatheringSpeed rate; stops at targetQuantity.</td></tr>
+        <tr><td rowspan="4">19</td><td>DeliverStepSystem</td><td>Tick</td><td>Executes DeliverStep — instant one-tick transfer from character inventory to the target's InventoryComponent. Target may be a Tiled building (targetObjectId) or a runtime GameEntity (targetGameId).</td></tr>
+        <tr><td>PickupStepSystem</td><td>Tick</td><td>Mirror of DeliverStepSystem — items flow source &rarr; worker. Source may be Tiled (sourceObjectId) or GameEntity (sourceGameId, reserved).</td></tr>
+        <tr><td>SellStepSystem</td><td>Tick</td><td>Executes SellStep — atomic exchange at the buyer: items worker&rarr;buyer, gold buyer&rarr;worker. UnlimitedGoldComponent on the buyer skips gold deduction.</td></tr>
+        <tr><td>DynastySystem</td><td>Tick</td><td>Three phases: Phase A rebuilds runtime entity handles from PackedIds; Phase B finalises NPC membership when a Hire task is Done; Phase C posts HireWorker tasks for dynasty-owned workshops with open member slots. Must run before TaskCleanupSystem (20).</td></tr>
+        <tr><td rowspan="2">20</td><td>TaskCleanupSystem</td><td>Tick</td><td>Also CameraSystem (every frame). Destroys Done/Failed task entities; removes CurrentTaskComponent from the character.</td></tr>
+        <tr><td>CameraSystem</td><td>Frame</td><td>Also priority 20. Camera handling.</td></tr>
+        <tr><td>79</td><td>DebugRotationSystem</td><td>Frame</td><td>Spins debug entities.</td></tr>
+        <tr><td>80</td><td>DebugTileProfilingSystem</td><td>Frame</td><td>Tile profiling overlay.</td></tr>
+        <tr><td>85</td><td>DebugRenderSystem</td><td>Frame</td><td>Debug draw (shapes, paths, etc.).</td></tr>
+        <tr><td>86</td><td>DebugEntitySystem</td><td>Frame</td><td>ImGui entity inspector panel.</td></tr>
+        <tr><td>90</td><td>TileSpriteRenderSystem</td><td>Frame</td><td>Renders tilemap sprites.</td></tr>
+        <tr><td>100</td><td>BasicSpriteRenderSystem</td><td>Frame</td><td>Renders entity sprites.</td></tr>
+        <tr><td>150</td><td>CharacterSystem</td><td>Frame</td><td>Character animation / visual state.</td></tr>
+        <tr><td>200</td><td>BasicEntitySystem</td><td>Frame</td><td>Assigns StableIds via GameEntityComponent on_construct.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Task Step Execution Order</h2>
+    <h3>Gather+Deliver (4 steps)</h3>
+    <table>
+      <thead><tr><th>Step</th><th>System</th><th>Priority</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>MoveToStepSystem</td><td>17</td><td>Walk to gathering spot.</td></tr>
+        <tr><td>1</td><td>GatherStepSystem</td><td>18</td><td>Gather items into character inventory.</td></tr>
+        <tr><td>2</td><td>MoveToStepSystem</td><td>17</td><td>Walk to target workshop.</td></tr>
+        <tr><td>3</td><td>DeliverStepSystem</td><td>19</td><td>Transfer items to building inventory.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>HireWorker (1 step)</h3>
+    <table>
+      <thead><tr><th>Step</th><th>System</th><th>Priority</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>MoveToStepSystem</td><td>17</td><td>Walk to dynasty workshop. On Done: DynastySystem emplaces DynastyMemberComponent on the NPC.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Craft (2 steps)</h3>
+    <table>
+      <thead><tr><th>Step</th><th>System</th><th>Priority</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>MoveToStepSystem</td><td>17</td><td>Walk to the workshop tile.</td></tr>
+        <tr><td>1</td><td>CraftStepSystem</td><td>16</td><td>Each minute, accumulate progress; on accumulator &ge; 1.0, deduct materials and add the crafted item. Marks task Done when materials run out.</td></tr>
+      </tbody>
+    </table>
+
+    <h3>Sell (6 steps)</h3>
+    <table>
+      <thead><tr><th>Step</th><th>System</th><th>Priority</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>MoveToStepSystem</td><td>17</td><td>Walk to the workshop tile.</td></tr>
+        <tr><td>1</td><td>PickupStepSystem</td><td>19</td><td>Take stackLimit items from workshop &rarr; worker inventory.</td></tr>
+        <tr><td>2</td><td>MoveToStepSystem</td><td>17</td><td>Walk to the marketplace tile.</td></tr>
+        <tr><td>3</td><td>SellStepSystem</td><td>19</td><td>Atomic exchange: items worker&rarr;buyer, gold buyer&rarr;worker.</td></tr>
+        <tr><td>4</td><td>MoveToStepSystem</td><td>17</td><td>Walk back to the workshop tile.</td></tr>
+        <tr><td>5</td><td>DeliverStepSystem</td><td>19</td><td>Deposit all gold from the worker into the workshop's owning DYNASTY entity (targetGameId path).</td></tr>
+      </tbody>
+    </table>
+
+    <h3>ReturnGoods (2 steps) — failure recovery</h3>
+    <table>
+      <thead><tr><th>Step</th><th>System</th><th>Priority</th><th>Description</th></tr></thead>
+      <tbody>
+        <tr><td>0</td><td>MoveToStepSystem</td><td>17</td><td>Walk to the workshop tile.</td></tr>
+        <tr><td>1</td><td>DeliverStepSystem</td><td>19</td><td>Deliver EVERY stack the worker carries to the workshop (itemType empty + quantity=0). Target uses targetObjectId.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="section">
+    <h2>Fallback Task Shapes</h2>
+    <ul>
+      <li><strong>2-step</strong> — MoveToStep + GatherStep (no workshops present)</li>
+      <li><strong>1-step</strong> — MoveToStep only (no gathering spots present)</li>
+    </ul>
+  </div>
+
+  <hr class="divider" />
+
+  <div class="section">
+    <h2>Key Design Notes</h2>
+    <ul>
+      <li><strong>Tag-based step routing (May 2026):</strong> each character entity carries exactly one zero-size tag (MoveToStepActiveTag, GatherStepActiveTag, DeliverStepActiveTag, PickupStepActiveTag, SellStepActiveTag, CraftStepActiveTag) while a task is InProgress. Step systems pre-filter via EnTT view intersection for O(N_chars_in_step) instead of O(N_all_chars).</li>
+      <li><strong>Tags are NOT serialised.</strong> StepTagRebuildSystem (priority 13) restores them on the first tick after a save load.</li>
+      <li><strong>stepStarted guards</strong> one-shot setup (e.g. emplace MoveGoalComponent, trigger transfer). TaskStepsComponent::Advance() resets stepStarted so the next executor picks up immediately on the same tick.</li>
+      <li>TaskClaimSystem (15) runs before PathfindingSystem (16) so a task claimed and set to InProgress in the same tick immediately gets a pathfinding goal.</li>
+      <li>DeliverStepSystem (19) runs after GatherStepSystem (18) so on the tick MoveToStepSystem advances past the walk-to-workshop step, DeliverStep is picked up and completed in the same tick.</li>
+      <li>DynastySystem (19) runs after all step systems so Done hire tasks are still alive for membership finalisation, and before TaskCleanupSystem (20) destroys them.</li>
+      <li>AlchemyShopSystem and CarpenterShopSystem only post work tasks for workshops that carry DynastyWorkshopComponent. Independent workshops stay silent.</li>
+      <li>Both workshop systems live in WorkshopSystems.cpp; BuildingSystems.cpp only carries generic building lifecycle.</li>
+      <li>Workshop systems prefer Sell &rarr; Craft &rarr; Gather in that order.</li>
+      <li>CraftStepSystem runs at Minute frequency rather than Tick — items are produced on the order of game-hours.</li>
+      <li>Gold is a normal DB item (items/currency/gold). It moves through DeliverStep / PickupStep like anything else. Marketplaces carry UnlimitedGoldComponent.</li>
+      <li>DeliverStep and PickupStep use a dual-id pattern for target/source: a Tiled GUID (*ObjectId) for buildings, OR an id_index of GameEntityComponent.id (*GameId) for runtime GameEntities.</li>
+      <li>Failure recovery for Sell tasks lives in TaskFailureRecoverySystem (pri 14). It uses on_destroy to capture the worker entity, then posts a ReturnGoods task onto the worker's personal noticeboard.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>Dynasty Membership Lifecycle</h2>
+    <ul>
+      <li>DynastySystem posts HireWorker task &rarr; TaskClaimSystem (NPC claims it)</li>
+      <li>&rarr; MoveToStepSystem walks NPC to workshop &rarr; task Done</li>
+      <li>&rarr; DynastySystem Phase B emplaces DynastyMemberComponent on NPC.</li>
+    </ul>
+    <p><strong>Firing (dynasty-initiated):</strong> DynastySystem::Fire() removes DynastyMemberComponent and updates the dynasty's member lists directly — no task needed.</p>
+    <h3>Components</h3>
+    <ul>
+      <li><code>DynastyComponent</code> — on the dynasty entity (name, gold, maxMembers, member/workshop lists).</li>
+      <li><code>DynastyMemberComponent</code> — on character entities; absent = independent NPC.</li>
+      <li><code>DynastyWorkshopComponent</code> — on workshop entities; absent = independent workshop.</li>
+      <li><code>DynastyInitComponent</code> — tag; triggers handle resolution pass in DynastySystem Phase A.</li>
+    </ul>
+  </div>
+
+</div>
+</div>
+<script src="../assets/nav.js"></script>
+</body>
+</html>

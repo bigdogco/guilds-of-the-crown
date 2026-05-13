@@ -1,0 +1,407 @@
+================================================================================
+  CRAFTING FLOW  -  Design & Implementation Notes
+  CraftStep + CraftStepSystem, workshop crafting brain  (May 2026)
+================================================================================
+
+This document describes the crafting task flow.  Read alongside:
+  - task_system.txt              for the underlying multi-step task framework
+  - task_noticeboard_system.txt  for noticeboard scoping rules
+
+
+1.  PURPOSE
+--------------------------------------------------------------------------------
+Workshops convert raw materials they hold in their InventoryComponent into
+finished crafted goods (sword, staff, bread, health_potion, ...).  Crafting:
+
+  - is performed BY a worker (DynastyMember of the workshop) AT the workshop
+  - consumes whole-number quantities of materials per item produced
+  - takes hours of in-game time per item, scaled by the worker's handcraft
+  - cohabits with the existing Gather+Deliver flow on the same worker pool
+
+
+2.  ARCHITECTURE OVERVIEW
+--------------------------------------------------------------------------------
+
+  PRODUCERS                         NOTICEBOARD              CONSUMERS
+  ---------                         -----------              ---------
+
+  AlchemyShopSystem  (Minute) --\
+  CarpenterShopSystem (Minute) ---> TaskNoticeboard  -->  TaskClaimSystem
+                                    (workshop-scoped)     (idle workers)
+                                          ^
+                                          |
+                              on_construct<TaskComponent>
+
+  Each shop system runs PostWorkshopTasks once per workshop.  Inside, for
+  every free worker slot, it asks:
+
+      Can I craft something?  (any craft_item with all materials >= 50?)
+                |                         |
+              YES                        NO
+                |                         |
+       post Craft task              post Gather+Deliver task
+                                    (existing flow, unchanged)
+
+
+  STEP EXECUTION FLOW (worker who claimed a Craft task)
+  -----------------------------------------------------
+
+  Priority 17                   16                              20
+  +------------------+   +------------------+   +------------------+
+  | MoveToStepSystem |   | CraftStepSystem  |   | TaskCleanupSystem|
+  | walk to workshop |   | accumulate +     |   | destroy Done /   |
+  |                  |   |   produce items  |   |   Failed task    |
+  +------------------+   +------------------+   +------------------+
+        Tick                   Minute                  Tick
+
+  CraftStepSystem priority is 16 (between TaskClaim 15 and MoveToStep 17),
+  but it runs at Minute frequency, so it does not race with the per-tick
+  step executors.
+
+
+3.  COMPONENTS INTRODUCED
+--------------------------------------------------------------------------------
+
+3.1  WorkshopCraftingComponent  (BuildingComponents.h)
+
+    struct WorkshopCraftingComponent {
+        std::vector<Spark::StringId> craftItems;  // DB paths of craftables
+    };
+
+  Runtime-only — NOT serialised.  Emplaced/refreshed/removed by
+  Database::SetupBuildingLevelData on every level init based on the
+  current level's craft_items array.  Buildings without craft_items
+  in their JSON simply don't get this component.
+
+3.2  CraftStep  (TaskComponents.h, in the TaskStep variant)
+
+    struct CraftStep {
+        Spark::StringId itemType{};            // DB path of the item to craft
+        float craftHoursPerItem  = 1.0f;       // from item's craftTime, cached
+        float accumulator        = 0.f;        // progress to next item [0, 1)
+        int   crafted            = 0;          // total produced this step
+        entt::entity workshop    = entt::null; // runtime handle (not serialised)
+        int   workshopObjectId   = 0;          // ObjectEntityComponent.id (serialised)
+    };
+
+  Save/load (Option B dual-field pattern):
+    workshop          - rebuilt from workshopObjectId in TilemapWorld::LoadEntities
+    workshopObjectId  - persistent companion (Tiled GUID, plain int)
+    craftHoursPerItem - cached at task creation so the system needn't re-read
+                        the item DB to compute the rate
+    accumulator       - serialised so in-flight progress survives save/load
+
+3.3  TaskType::Craft
+
+  New value in the TaskType enum.  Used for task counting and noticeboard
+  filtering — Craft tasks are NOT redirected to the city like Hire tasks;
+  they stay on the workshop's own board.
+
+
+4.  DATA / DB SHAPE
+--------------------------------------------------------------------------------
+
+4.1  Item entry (data/database/items/crafted/desc.json)
+
+    "sword": {
+        "name":       "Sword",
+        "category":   "crafted_weapon",
+        "stackLimit": 10,
+        "baseValue":  80,
+        "craftTime":  3,                                       <-- HOURS per item
+        "materials": [
+            { "item_type": "items/raw/wood",       "quantity": 10 },
+            { "item_type": "items/raw/iron_ingot", "quantity": 10 }
+        ]
+    }
+
+  Why an array of objects instead of a map?  Spark::Config treats '/' in map
+  keys as a path separator, which would split "items/raw/grain" into nested
+  ConfigMaps when parsed.  Using an array of {item_type, quantity} objects
+  avoids the issue and matches the pattern already used by InventoryComponent.
+
+  craftTime is interpreted as "in-game hours required to craft one unit at
+  baseline skill (handcraft = 10)".  bread=1, staff=2, sword=3.
+
+4.2  Workshop level entry (data/database/buildings/workshops/.../desc.json)
+
+    "levels": {
+        "1": {
+            ...
+            "craft_items": [
+                "items/crafted/staff",
+                "items/crafted/sword"
+            ],
+            ...
+        }
+    }
+
+  Each entry is a full DB path (string).  The workshop "knows how to make"
+  exactly the items in this list at its current level.  Upgrading the
+  workshop refreshes WorkshopCraftingComponent automatically.
+
+
+5.  CRAFTING SPEED FORMULA
+--------------------------------------------------------------------------------
+
+  CraftStepSystem runs once per game minute and adds to the accumulator:
+
+      itemsPerMinute = (handcraft * 0.1) / (craftHoursPerItem * 60)
+
+  Worked examples (handcraft = 10):
+
+      bread  (craftTime=1):   1.0  / 60   = 0.0167 items/minute = 1 item/hour
+      staff  (craftTime=2):   1.0  / 120  = 0.0083 items/minute = 0.5 items/hour
+      sword  (craftTime=3):   1.0  / 180  = 0.0056 items/minute = 0.333 items/hour
+
+  At handcraft = 20 (twice as skilled), all rates double.  At handcraft = 5,
+  they halve.  No diminishing returns — the formula is a straight scalar.
+
+  Granularity:  Minute-tick is sufficient because items take hours to produce;
+  the worst-case timing error is < 1 game-minute, negligible at this scale.
+
+
+6.  WORKSHOP TASK-POSTING LOGIC
+--------------------------------------------------------------------------------
+
+  PostWorkshopTasks (file-local helper in BuildingSystems.cpp) runs once per
+  workshop per spawn-interval tick (currently 600 ticks = 10 in-game minutes).
+
+  For each workshop:
+
+    1.  Count current workers (WorkshopWorkerComponent), pending Hire tasks,
+        and active non-Hire tasks.
+    2.  Post Hire tasks for any open worker slots (unchanged).
+    3.  Compute workTasksToPost = workerCount - activeWorkTasks.
+    4.  For each free work slot:
+
+        a.  Look up WorkshopCraftingComponent and InventoryComponent on the
+            workshop entity.
+        b.  Iterate craftItems.  For each, read its materials map from the DB.
+        c.  HasMaterialsAboveThreshold? -> Every required material is present
+            at >= CRAFT_MATERIAL_THRESHOLD (50).
+                YES: post Craft task with steps [MoveToStep(workshop), CraftStep]
+                     break — one craft task per slot iteration.
+                NO:  fall through to gather.
+        d.  Gather fallback: if there are gathering spots and no craft was
+            posted, post the existing Gather+Deliver task.
+
+  The check is "any one craftable item has full materials".  As long as that
+  is true, the workshop posts crafting tasks; once materials drop below the
+  threshold for every craftable item, it goes back to gathering.
+
+
+7.  CRAFTSTEPSYSTEM EXECUTION
+--------------------------------------------------------------------------------
+
+  Once per game minute, for every character with CurrentTaskComponent +
+  CharacterAttributesComponent whose current step is a CraftStep:
+
+    1.  First-tick handshake
+          - Set stepsComp->stepStarted = true
+          - Resolve craftStep.workshop from workshopObjectId if null
+            (covers fresh tasks AND post-load reconstruction).
+          - If the workshop entity is invalid -> task.state = Failed.
+          - If the workshop has no InventoryComponent -> task.state = Failed.
+
+    2.  Accumulate progress
+          accumulator += (handcraft * 0.1) / (craftHoursPerItem * 60)
+
+    3.  Item production loop  (while accumulator >= 1.0)
+          a. accumulator -= 1.0
+          b. Read fresh materials list from item DB.
+             (Cheap — happens once every game-hour at most.)
+          c. Check each material is still available at the required quantity
+             in the workshop's inventory.
+                If not -> task.state = Done, break out of loop.
+                Workshop will re-evaluate next minute.
+          d. Deduct materials in whole numbers; erase fully-consumed stacks.
+          e. Add one of craftStep.itemType to the workshop inventory.
+          f. ++craftStep.crafted (logging only).
+
+  Materials are deducted PER COMPLETED ITEM, never up-front.  This guarantees:
+    - inventory never holds fractional items
+    - task cancellation/failure mid-accumulation needs no refund logic
+    - if a higher-priority concern empties the workshop's stock between
+      items (e.g. a sale), the next item simply fails the materials check
+      and the task ends cleanly.
+
+
+8.  TASK LIFECYCLE  (worker's perspective)
+--------------------------------------------------------------------------------
+
+  Worker idle, employed at workshop W
+        |
+        v
+  [TaskClaimSystem]  picks up a Craft task posted by W
+        |
+        v
+  [MoveToStepSystem, priority 17, Tick]
+        Step 0 = MoveToStep(workshopTile)
+        Walk to workshop.  When arrived, Advance() to step 1.
+        |
+        v
+  [CraftStepSystem, priority 16, Minute]
+        Step 1 = CraftStep
+        Each minute: accumulate, possibly produce item(s).
+        Loop until either:
+          - materials exhausted        -> task.state = Done
+          - external interrupt fails   -> task.state = Failed
+        |
+        v
+  [TaskCleanupSystem, priority 20, Tick]
+        Destroy task entity.
+        Remove worker's CurrentTaskComponent -> idle again.
+        |
+        v
+  Next workshop minute tick: AlchemyShopSystem / CarpenterShopSystem
+  re-evaluates.  If materials are still above threshold, posts another
+  Craft task.  Otherwise, posts a Gather+Deliver task.
+
+
+9.  GATHER vs CRAFT INTERACTION
+--------------------------------------------------------------------------------
+
+  Both phases share the same workTasksToPost budget — a workshop NEVER posts
+  more total work tasks than it has workers, regardless of mix.
+
+  Behaviour by inventory state:
+
+    materials < 50 of any required item   -> craft skipped, gather posted
+    materials >= 50 of every required     -> craft posted, gather skipped
+    no gathering spots AND can't craft    -> worker stays idle this interval
+
+  Because the shop system runs every 10 in-game minutes and CraftStepSystem
+  runs every minute, a worker that finishes a craft task can be back on the
+  noticeboard for ~10 minutes before a new task is queued.  This is fine
+  (negligible vs. game-hour crafting) but if it ever becomes visible, drop
+  SPAWN_INTERVAL_TICKS or trigger immediate re-evaluation when a craft task
+  reaches Done.
+
+
+10. ADDING A NEW CRAFTABLE ITEM
+--------------------------------------------------------------------------------
+
+  1. Add the item entry under data/database/items/crafted/desc.json with:
+       - name, category, stackLimit, baseValue
+       - craftTime  (hours per unit at baseline skill)
+       - materials  (map: source DB path -> required quantity)
+
+  2. List its full DB path in the desired workshop's level "craft_items":
+       data/database/buildings/workshops/<shop>/desc.json
+
+  3. Rebuild — DBIds.h is regenerated by tools/gen_db_ids.py.
+
+  No code changes required.  The crafting system is data-driven for items.
+
+  To make a NEW kind of workshop able to craft:
+    - Define its component (e.g. SmithyComponent : BuildingComponent)
+    - Add a SmithySystem mirroring AlchemyShopSystem / CarpenterShopSystem
+      (call PostWorkshopTasks<SmithyComponent, SomeSpot>)
+    - Register both in GoCApp::Init()
+    - Populate craft_items in its DB level entries
+
+
+11. FILE INVENTORY
+--------------------------------------------------------------------------------
+
+  Modified:
+    Utils/Tags.h                          + craft_items, craft_time, materials,
+                                            craft_hours_per_item, craft_workshop_id
+    Esc/Components/BuildingComponents.h   + WorkshopCraftingComponent
+    Esc/Components/TaskComponents.h       + TaskType::Craft
+                                          + CraftStep struct + variant entry
+                                          + STEP_TYPE_CRAFT + serialisation
+                                          + to_string cases
+    Game/DB/Database.cpp                  Reads craft_items in
+                                          SetupBuildingLevelData and emplaces /
+                                          refreshes / removes
+                                          WorkshopCraftingComponent
+    GoCApp.cpp                            + CraftStepSystem + WorkshopSystems +
+                                            GatheringSpotSystem registrations /
+                                            includes (Buildings file split, see
+                                            below)
+
+  New:
+    Esc/Systems/CraftStepSystem.h         CraftStepSystem declaration
+    Esc/Systems/CraftStepSystem.cpp       CraftStepSystem impl (Minute frequency).
+                                          Log channel: esc.craft
+    Esc/Systems/BuildingUtils.h           Header-only crafting helpers shared by
+                                          workshop / future marketplace code:
+                                            CRAFT_MATERIAL_THRESHOLD = 50
+                                            struct CraftItemData
+                                            ReadCraftItemData(itemDbPath, out)
+                                            HasMaterialsAboveThreshold(inv, mats, thr)
+    Esc/Systems/WorkshopSystems.h         Holds AlchemyShopSystem and
+                                          CarpenterShopSystem declarations
+                                          (extracted from BuildingSystems.h).
+    Esc/Systems/WorkshopSystems.cpp       Holds the file-local PostWorkshopTasks
+                                          template + the two workshop Update
+                                          implementations.  Posts Hire / Craft /
+                                          Gather+Deliver tasks.
+                                          Log channel: esc.workshop
+    Esc/Systems/GatheringSpotSystem.h     GatheringSpotSystem declaration
+                                          (extracted from BuildingSystems.h).
+    Esc/Systems/GatheringSpotSystem.cpp   GatheringSpotSystem impl.
+                                          Log channel: esc.gathering
+
+  Result of the split:
+    BuildingSystems.h/.cpp now only carry the generic building lifecycle —
+    BuildingSystem, HouseSystem, BuildingUpgradeSystem.  Workshop, gathering-
+    spot, and crafting concerns each live in their own file.
+
+
+12. STABLEID / ID USAGE
+--------------------------------------------------------------------------------
+
+  CraftStep.workshop          entt::entity, runtime-only.
+  CraftStep.workshopObjectId  int (Tiled object GUID), serialised.
+                              Resolved via GetObjectById(...)->getEntityId().
+                              NOT a PackedId — workshops are tilemap objects,
+                              not GameEntity stable ids.
+
+  TaskComponent.postedBy      Workshop entity (existing pattern).
+  TaskComponent.postedById    Workshop ObjectEntityComponent.id.
+
+
+13. WHAT IS NOT BUILT YET
+--------------------------------------------------------------------------------
+
+  - Quality / variant items (every sword is identical)
+  - Multi-output recipes (one craft = one item type only)
+  - Crafting XP / handcraft progression for the worker
+  - Workshop-specialised modifiers (e.g. master smith bonus on swords)
+  - Material substitutions (alternative recipes)
+  - Marketplace consumption of crafted goods (Marketplace exists as a stub
+    only — pulling crafted goods out of workshops into market stalls is the
+    next major step)
+  - Inventory capacity limits on workshops (a workshop can stockpile
+    unlimited swords today)
+  - Save/load reconstruction of CraftStep.workshop in TilemapWorld::LoadEntities
+    follows the same Option B pattern as GatherStep.spot — needs the same
+    hookup if not already wired
+
+
+14. HOW TO TEST
+--------------------------------------------------------------------------------
+
+  1. Place at least one carpenter_shop or alchemy_shop in the test world,
+     assign a dynasty, and let it hire workers.
+
+  2. Let workers gather wood / berries until the workshop's
+     InventoryComponent shows >= 50 of each required material.
+
+  3. On the next workshop spawn tick (every 10 in-game minutes), watch
+     channel "esc.workshop" for:
+        "CarpenterShop <N> posted Craft 'items/crafted/staff' task."
+
+  4. Watch channel "esc.craft" for:
+        "CraftStep started: Task StableId=... item='items/crafted/staff' craftHours=2"
+        "Crafted 1x 'items/crafted/staff' (total this step: 1) StableId=..."
+        "CraftStep: materials exhausted after N items - task Done."
+
+  5. Verify the workshop's InventoryComponent now contains crafted items
+     and the consumed raw materials are gone (whole-number quantities only).
+
+  6. Verify the workshop returns to posting Gather tasks once materials
+     dip below threshold for every craftable item.

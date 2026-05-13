@@ -1,0 +1,401 @@
+================================================================================
+  SELLING FLOW  -  Design & Implementation Notes
+  PickupStep + SellStep + dynasty gold deposit  (May 2026)
+================================================================================
+
+This document describes the selling task flow.  Read alongside:
+  - task_system.txt              for the underlying multi-step task framework
+  - task_noticeboard_system.txt  for noticeboard scoping rules
+  - task_crafting.txt            for the upstream production flow
+
+
+1.  PURPOSE
+--------------------------------------------------------------------------------
+Workshops accumulate crafted goods via the crafting flow.  Once a stack is full
+(quantity >= stackLimit), a Sell task moves that full stack to the nearest
+marketplace in exchange for gold, which is then deposited into the owning
+dynasty's treasury.
+
+  - Trigger: any craftable item in the workshop inventory hits stackLimit.
+  - Quantity: one full stack per task.
+  - Price:    pure item baseValue from the DB (no markup / demand yet).
+  - Buyer:    nearest entity with MarketplaceComponent (Manhattan distance).
+  - Payee:    the workshop's owning dynasty entity (NOT the workshop itself).
+  - Worker:   one employee per work-slot per spawn interval.
+
+
+2.  ARCHITECTURE OVERVIEW
+--------------------------------------------------------------------------------
+
+  +----------------------+
+  |  WorkshopSystems     |  PostWorkshopTasks per worker slot:
+  |  (Alchemy/Carpenter) |    1. Sell phase  -> if full stack, post Sell task
+  |                      |    2. Craft phase -> if materials available, post Craft
+  |                      |    3. Gather phase -> fallback
+  +----------+-----------+
+             |
+             v
+       Sell task posted on workshop's NoticeboardComponent
+             |
+             v
+       TaskClaimSystem assigns to an idle worker of that workshop
+             |
+             v
+       6-step execution (see section 4)
+             |
+             v
+       Gold ends up in dynastyEntity.InventoryComponent
+
+  Step executors used:
+    MoveToStepSystem   (priority 17) - 3x walks per task
+    PickupStepSystem   (priority 19) - take items from workshop
+    SellStepSystem     (priority 19) - atomic exchange at marketplace
+    DeliverStepSystem  (priority 19) - deposit gold at dynasty
+
+
+3.  GOLD AS A DATABASE ITEM
+--------------------------------------------------------------------------------
+
+Gold is just another item, defined in data/database/items/currency/gold/desc.json.
+It plays by all the same rules as any other item: lives in InventoryComponent
+stacks, transferred by DeliverStep / PickupStep, no special transport plumbing.
+
+Helpers in ItemUtils.h:
+    AddGold(r, entity, amount)             append to entity's inventory
+    GetGoldAmount(r, entity)               total quantity held
+    TryDeductGold(r, entity, amount)       deduct, but skip for UnlimitedGold
+
+UnlimitedGoldComponent is a tag.  Any entity carrying it is treated as having
+infinite gold by TryDeductGold (it returns true without touching the inventory).
+Used by MarketplaceSystem to mark marketplace entities — they always pay.
+
+
+4.  TASK STRUCTURE (6 STEPS)
+--------------------------------------------------------------------------------
+
+Step | System            | Purpose
+-----+-------------------+----------------------------------------------------
+  0  | MoveToStepSystem  | Walk to workshop tile (in case worker isn't there)
+  1  | PickupStepSystem  | Pickup stackLimit items from workshop inventory
+  2  | MoveToStepSystem  | Walk to marketplace tile
+  3  | SellStepSystem    | ATOMIC: items worker->buyer, gold buyer->worker
+  4  | MoveToStepSystem  | Walk back to workshop tile
+  5  | DeliverStepSystem | Deposit gold into DYNASTY inventory (GameEntity target)
+-----+-------------------+----------------------------------------------------
+
+Step 5 is the subtle one: the worker walks back to the workshop tile (because
+the dynasty entity has no map position), but the gold deposit targets the
+dynasty entity itself, not the workshop.  The workshop is the dynasty's
+"local office" — gold goes into the dynasty's abstract treasury.
+
+
+5.  STEP COMPONENT STRUCTURES
+--------------------------------------------------------------------------------
+
+5.1  PickupStep (new in this milestone)
+
+    struct PickupStep {
+        entt::entity source;            // runtime handle
+        int      sourceObjectId;        // Tiled GUID (workshop) - or
+        PackedId sourceGameId;          // GameEntity id_index - exactly one is non-zero
+        Spark::StringId itemType;
+        int      quantity;              // 0 = all of itemType
+    };
+
+  The GameEntity source path (sourceGameId) is provided for symmetry with
+  DeliverStep but has NO PRODUCER yet.  The PickupStepSystem.cpp header
+  carries a FUTURE-TESTING note flagging this — exercise when we have an
+  actual flow that pulls from a runtime GameEntity (e.g. one dynasty buying
+  items from another dynasty's treasury, character-to-character transfer).
+
+5.2  SellStep (new in this milestone)
+
+    struct SellStep {
+        entt::entity buyer;             // runtime handle
+        int  buyerObjectId;             // Tiled GUID (marketplace)
+        Spark::StringId itemType;
+        int  quantity;                  // >= 1
+        int  pricePerUnit;              // cached from item DB baseValue at task creation
+    };
+
+  No GameEntity buyer path yet — marketplaces are always Tiled objects.
+
+5.3  DeliverStep (extended in this milestone — dual-id)
+
+    struct DeliverStep {
+        entt::entity target;
+        int      targetObjectId;        // Tiled GUID (workshop) - or
+        PackedId targetGameId;          // GameEntity id_index (dynasty, city) - one non-zero
+        Spark::StringId itemType;       // empty = all items
+        int      quantity;              // 0 = all of itemType
+    };
+
+  Mirrors the Option-B dual-field pattern already used by TaskComponent.postedBy.
+
+
+6.  ATOMICITY OF SELLSTEP
+--------------------------------------------------------------------------------
+
+SellStepSystem is one-shot (gated by stepStarted).  In a single tick:
+
+  1. Resolve buyer runtime handle (lazy from buyerObjectId).
+  2. Validate buyer + buyer inventory + quantity > 0 + pricePerUnit >= 0.
+  3. PRE-CHECK:
+       - Worker carries quantity of itemType?
+       - Buyer can pay (UnlimitedGoldComponent OR gold >= totalPrice)?
+     If either fails -> task.state = Failed, nothing transferred.
+  4. COMMIT (guaranteed to succeed by pre-check):
+       TryDeductGold(buyer, totalPrice)       // no-op for UnlimitedGold
+       TryDeductItem(worker, itemType, qty)
+       AddItem(buyer,  itemType, qty)
+       AddItem(worker, gold,     totalPrice)
+
+The pre-check / commit split keeps the swap atomic — there is no intermediate
+state where the worker has lost items but not received gold.
+
+
+7.  WORKSHOP DECISION ORDER
+--------------------------------------------------------------------------------
+
+PostWorkshopTasks iterates each free worker slot.  Per slot:
+
+  1. Sell phase
+        For each item in WorkshopCraftingComponent.craftItems:
+          read stackLimit / baseValue from DB
+          if workshop has stack >= stackLimit:
+            find nearest MarketplaceComponent (Manhattan)
+            build 6-step Sell task targeting dynasty inventory
+            post and break
+  2. Craft phase   (existing — see task_crafting.txt)
+  3. Gather phase  (existing — see task_noticeboard_system.txt)
+
+Sell is preferred over Craft because a full stack means we're at capacity for
+that item — selling it before crafting more keeps the workshop responsive.
+
+Backpressure: activeWorkTasks counts Sell tasks the same as Craft/Gather, so
+a single-worker workshop won't overlap sell trips with other work.  Multiple
+sell-eligible items at the same workshop will each get their own task across
+slots / intervals, not in one batch.
+
+
+8.  PRICING (CURRENT)
+--------------------------------------------------------------------------------
+
+  pricePerUnit = baseValue from item DB.  No markup, no demand curve.
+
+  Example:  health_potion baseValue=8, stackLimit=10
+            => one Sell task moves 10 potions for 80 gold.
+
+  Future: per-buyer multipliers, item demand, regional pricing.
+
+
+9.  GOLD FLOW & DYNASTY DEPOSIT
+--------------------------------------------------------------------------------
+
+Workshop's owning dynasty is resolved from DynastyWorkshopComponent.dynasty at
+task-post time (NOT at execution time).  Captured into DeliverStep:
+
+    depositGold.target         = dynastyEntity;
+    depositGold.targetObjectId = 0;
+    depositGold.targetGameId   = id_index(dynasty's GameEntityComponent.id);
+    depositGold.itemType       = DB::items::currency::gold;
+    depositGold.quantity       = 0;  // all gold the worker carries
+
+After the worker arrives at the workshop tile, the DeliverStep dumps every
+gold stack it carries into the dynasty's InventoryComponent.
+
+DynastySystem Phase C / Phase D already read gold via GetGoldAmount(r,
+dynastyEntity) since the gold-as-item migration, so the dynasty can immediately
+use the proceeds to buy or upgrade workshops.
+
+
+10. FAILURE HANDLING
+--------------------------------------------------------------------------------
+
+  Step-level failure modes:
+
+    PickupStep fails  ->  task.state = Failed.  Source didn't have the items.
+    SellStep fails    ->  task.state = Failed.  Worker still holds the items.
+    Worker invalid    ->  task.state = Failed.
+
+  On failure the trailing MoveTo + Deliver(gold) steps still exist in the task
+  list, but the task is terminal so they never run.  Without recovery, any
+  items the worker picked up earlier would remain stuck in their inventory.
+
+  10.1  TaskFailureRecoverySystem  (priority 14, Tick)
+  --------------------------------------------------------------------------
+  Watches for Failed Sell tasks via on_destroy<TaskComponent> and posts a
+  follow-up ReturnGoods task on the worker's PERSONAL noticeboard.  Two-phase
+  so the signal callback stays lightweight (CLAUDE.md):
+
+    Phase 1  (on_destroy callback, fires inside TaskCleanupSystem at pri 20):
+      if (task.state == Failed && task.type == Sell && claimedBy valid):
+          m_pendingWorkers.push_back(task.claimedBy);
+      No registry mutation, no nested signals — just stash the entity.
+
+    Phase 2  (Update, runs at priority 14 next tick, BEFORE TaskClaim at 15):
+      drain the queue.  For each worker:
+        skip if no inventory or it's empty       (nothing to recover)
+        skip if no WorkshopWorkerComponent       (worker was fired; items stay)
+        skip if workshop entity missing pieces   (defensive log + skip)
+        build 2-step ReturnGoods task:
+          0. MoveToStep   -> workshop tile
+          1. DeliverStep  target=workshop, itemType=empty, quantity=0
+                          (empty itemType + qty=0 = "deliver every stack")
+        postedBy       = workerEntity
+        postedByGameId = id_index(worker's GameEntityComponent.id)
+        postedById     = 0  (worker is a GameEntity, not Tiled)
+        r.emplace<TaskComponent>(...) triggers OnTaskConstructed in
+        NoticeboardSystem; default routing (postedBy) places the task on the
+        worker's own NoticeboardComponent, which get_or_emplace creates on demand.
+
+  10.2  Tick-by-tick walkthrough
+  --------------------------------------------------------------------------
+    Tick N:
+      SellStep(19)      task.state = Failed
+      TaskCleanup(20)   destroys task -> on_destroy fires
+                        -> TaskFailureRecoverySystem captures worker entity
+
+    Tick N+1:
+      TaskFailureRecoverySystem.Update(14)
+                        posts ReturnGoods task with postedBy=worker
+                        -> NoticeboardSystem routes onto worker's personal board
+      TaskClaimSystem(15)
+                        idle worker walks city + personal + workshop boards;
+                        sees ReturnGoods on personal -> claims -> InProgress
+      MoveToStep(17)    starts walking back to the workshop tile
+      ...
+    Tick N+M (after walk + deliver):
+      DeliverStep(19)   empties worker's inventory into workshop
+      Task DONE
+
+  10.3  Policy decisions (May 2026)
+  --------------------------------------------------------------------------
+    - Recovery triggers ONLY on Failed Sell tasks.  Other Failed task types
+      do not produce recovery tasks — items, if any, stay with the worker.
+    - If the worker is fired (no WorkshopWorkerComponent) between failure and
+      recovery, no recovery task is posted.  The character keeps the items.
+      A future "character checks their own inventory and sells what they don't
+      need" flow would handle this organically.
+    - If the worker is fired DURING an in-flight ReturnGoods, the task simply
+      completes — items end up at the workshop they were fired from.  This is
+      the spirit of "the goods belong to the workshop"; we can flip this later
+      if we want fired workers to walk off with the goods.
+
+
+11. FILE INVENTORY
+--------------------------------------------------------------------------------
+
+  Modified:
+    Utils/Tags.h                          + source_id, source_game_id, target_game_id,
+                                            buyer_id, price_per_unit,
+                                            stack_limit, base_value
+    Esc/Components/TaskComponents.h       + TaskType::Sell
+                                          + PickupStep, SellStep structs
+                                            (PickupStep has dual-id pattern;
+                                            SellStep is Tiled-only for now)
+                                          + DeliverStep gains targetGameId
+                                          + STEP_TYPE_PICKUP, STEP_TYPE_SELL
+                                          + serialisation + to_string cases
+    Esc/Systems/BuildingUtils.h           + ItemSaleData + ReadItemSaleData
+    Esc/Systems/WorkshopSystems.cpp       + Sell phase in PostWorkshopTasks
+                                            (builds 6-step task, deposits to
+                                            owning dynasty via targetGameId)
+    Esc/Systems/DeliverStepSystem.cpp     Lazy resolve from targetGameId
+                                            in addition to targetObjectId
+    GoCApp.cpp                            + PickupStepSystem + SellStepSystem
+                                            registrations
+
+  New (gold-as-item infrastructure):
+    data/database/items/currency/gold/desc.json   Gold item entry
+    Esc/Components/ItemComponents.h               UnlimitedGoldComponent tag
+    Esc/Systems/ItemUtils.h                       Gold helpers + generic
+                                                  Add/Get/TryDeduct item helpers
+
+  New (step executors):
+    Esc/Systems/PickupStepSystem.h/.cpp   Inverse of DeliverStep; carries the
+                                          FUTURE-TESTING note for the unused
+                                          GameEntity source branch.
+                                          Log channel: esc.task
+    Esc/Systems/SellStepSystem.h/.cpp     Atomic exchange with pre-check /
+                                          commit.  Log channel: esc.task
+
+  New (recovery):
+    Esc/Systems/TaskFailureRecoverySystem.h/.cpp
+                                          Listens for Failed Sell tasks via
+                                          on_destroy<TaskComponent>; posts
+                                          ReturnGoods recovery tasks onto the
+                                          worker's personal noticeboard.
+                                          Log channel: esc.recovery
+
+
+12. ID USAGE
+--------------------------------------------------------------------------------
+
+  PickupStep.source       entt::entity, runtime-only.
+  PickupStep.sourceObjectId  int (Tiled GUID).  Used for workshop sources.
+  PickupStep.sourceGameId    PackedId (id_index).  Reserved, no producer yet.
+
+  SellStep.buyer          entt::entity, runtime-only.
+  SellStep.buyerObjectId  int (Tiled GUID).  Marketplaces are Tiled objects.
+
+  DeliverStep.target           entt::entity, runtime-only.
+  DeliverStep.targetObjectId   int (Tiled GUID).  Used for workshop deposits.
+  DeliverStep.targetGameId     PackedId (id_index).  Used for dynasty / city
+                               deposits (entities with no Tiled object).
+
+  Convention: exactly one of the two ids is non-zero per step instance.
+
+
+13. WHAT IS NOT BUILT YET
+--------------------------------------------------------------------------------
+
+  - In-game way to deliberately fail Sell tasks for verifying §10 recovery
+    (need an admin/debug button to "fire worker mid-task" or "block buyer
+    pickup").  Recovery code is shipped but largely unobserved until then.
+  - Smarter sell triggers (queue tasks before stack overflows the limit;
+    threshold per item or per workshop level).
+  - Pricing: demand curves, regional, markups, marketplace mark-ups.
+  - Character-as-seller (independent NPC sells personal goods; sell task
+    omits the final Deliver step so gold stays with character).
+  - PickupStep from GameEntity sources (the sourceGameId branch is present
+    but no producer exercises it yet — flagged in PickupStepSystem.cpp).
+  - Save/load reconstruction of step.target / step.source in
+    TilemapWorld::LoadEntities — needs the same hookup as GatherStep.spot,
+    plus a GameEntity branch for targetGameId / sourceGameId.
+  - Marketplace inventory cap / restocking (it currently accepts items
+    indefinitely and never re-sells them).
+
+
+14. HOW TO TEST
+--------------------------------------------------------------------------------
+
+  1. Place at least one marketplace and one dynasty-owned workshop on the map.
+     Add a dynasty via the debug panel (seeds 50000 gold).
+
+  2. Watch the workshop's InventoryComponent fill up via the Craft phase.
+     Once any crafted item hits stackLimit (e.g. health_potion >= 10), a
+     Sell task is posted next workshop spawn tick.
+
+  3. Watch channel "esc.task" for the 6-step sequence:
+       MoveToStep started -> workshop
+       PickupStep started + done (picked up N items)
+       MoveToStep started -> marketplace
+       SellStep started + done (sold N items for X gold to buyer entity <M>)
+       MoveToStep started -> workshop
+       DeliverStep started + done -> target entity <DYNASTY_ID>
+       Task DONE
+
+  4. Verify the dynasty's gold in the debug Dynasties panel — it should
+     increase by `quantity * baseValue` per completed Sell task.
+
+  5. Verify the marketplace's InventoryComponent accumulates the items it
+     bought (useful for spot-checking SellStep's transfer).
+
+  6. Trigger gold-driven dynasty behaviour:
+        - If a dynasty has >= MIN_GOLD_TO_BUY (50000), DynastySystem Phase C
+          buys an unowned workshop.
+        - If a dynasty owns a workshop and has enough gold for the upgrade,
+          Phase D upgrades it.
+     Both phases now read gold from the dynasty's InventoryComponent, so the
+     sell loop drives the whole economic cycle.

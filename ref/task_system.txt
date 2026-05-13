@@ -1,0 +1,458 @@
+================================================================================
+  TASK SYSTEM  -  Design & Implementation Notes
+  Multi-step tasks, step executors, gather task  (April 2026)
+================================================================================
+
+NOTE (May 2026):
+  This document captures the original architecture of the multi-step task
+  system as it stood when the Gather task was first introduced.  The framework
+  itself is unchanged, but several extensions have landed since:
+
+    - Hire task type and per-owner NoticeboardComponent / NoticeboardSystem
+      (see task_noticeboard_system.txt)
+    - DeliverStep / DeliverStepSystem
+    - PickupStep / PickupStepSystem
+    - SellStep / SellStepSystem
+      (see task_selling.txt)
+    - Craft task type, CraftStep, CraftStepSystem
+      (see task_crafting.txt)
+    - Tag-based step routing (May 2026 — performance):
+      Each character entity now carries exactly one of six zero-size tag
+      components (MoveToStepActiveTag, GatherStepActiveTag, etc.) while a
+      task is InProgress.  Step systems pre-filter via view intersection
+      instead of iterating every character and calling try_get.  See
+      StepTags.h and section 3.5 below.
+
+  When the framework-level descriptions in this doc and the newer docs differ,
+  the newer docs win — they reflect the current code.  The "Adding a new step
+  type" section below is still accurate as a how-to guide.
+
+
+1.  PURPOSE
+--------------------------------------------------------------------------------
+Extend the task system from single-action (MoveTo only) to ordered multi-step
+sequences, with the first real task type being a two-step Gather task:
+
+    Step 0  MoveToStep   walk to the gathering spot
+    Step 1  GatherStep   accumulate items into inventory until target reached
+
+The architecture is designed so that adding future task types (Deliver, Build,
+Guard, etc.) only requires defining new step structs and a new step executor
+system — no changes to the claiming, noticeboard, or cleanup logic.
+
+
+2.  ARCHITECTURE OVERVIEW
+--------------------------------------------------------------------------------
+
+  PRODUCERS                  NOTICEBOARD              CONSUMERS
+  ---------                  -----------              ---------
+
+  TaskClaimSystem            TaskNoticeboard          TaskClaimSystem
+  (test spawn, Phase A)  --> (index on TilemapWorld)  (claim + start, Phase B/C)
+  Future: CityAI,                    |
+          WorkshopSystem,     entt signals:
+          NeedsSystem         on_construct<TaskComponent> -> RegisterTask
+                              on_destroy<TaskComponent>  -> UnregisterTask
+
+
+  STEP EXECUTION FLOW (one tick, priority order left to right)
+  ------------------------------------------------------------
+
+  Priority 15              16                  17                  18                  20
+  +-----------------+  +-----------+  +------------------+  +------------------+  +------------------+
+  | TaskClaimSystem |  | Pathfind- |  | MoveToStepSystem |  | GatherStepSystem |  | TaskCleanup-     |
+  | Phase A: spawn  |  | ingSystem |  | Phase A: start   |  | Phase A: start   |  | System           |
+  | Phase B: claim  |  |           |  |   MoveGoal       |  |   (flag only)    |  | Phase A: destroy |
+  | Phase C: start  |  |           |  | Phase B: process |  | Phase B: accum.  |  |   Done/Failed    |
+  |  InProgress     |  |           |  |   MoveResult,    |  | Phase C: check   |  | Phase B: remove  |
+  |                 |  |           |  |   advance step   |  |   completion     |  |   stale Current- |
+  +-----------------+  +-----------+  +------------------+  +------------------+  |   TaskComponent  |
+          |                  ^                 ^                                   +------------------+
+          |           emplace MoveGoal         |
+          |           (next tick)       on_construct<MoveResultComponent>
+          |                             fires synchronously inside PathfindingSystem
+          v
+  Task entity:  TaskComponent + TaskStepsComponent
+
+
+3.  KEY CONCEPTS
+--------------------------------------------------------------------------------
+
+3.1  Task entities
+
+  A task is an entt entity with two components:
+
+    TaskComponent         shared metadata (id, type, state, claimedBy, timestamps)
+    TaskStepsComponent    ordered step sequence + current step index + stepStarted flag
+    GameEntityComponent   provides a StableId (PackedId) for logging/save
+
+  Task entities have no TransformComponent or visual presence.
+  They are pure data describing work to be done.
+
+3.2  Task states
+
+    Posted      visible on the noticeboard, available for claiming
+    Claimed     reserved by a character, not yet executing
+    InProgress  character is actively working on the current step
+    Done        all steps completed successfully (terminal)
+    Failed      could not complete - path blocked, interrupted, cancelled (terminal)
+
+  Terminal states are destroyed by TaskCleanupSystem every tick.
+
+3.3  TaskStepsComponent
+
+  Holds the complete sequence of steps for a task.  Lives on the task entity
+  alongside TaskComponent.
+
+    struct TaskStepsComponent {
+        std::vector<TaskStep> steps;   // all steps, in order
+        int  currentStep  = 0;         // index into steps[]
+        bool stepStarted  = false;     // reset to false by Advance()
+    }
+
+  stepStarted is the handshake between phase transitions.  Each step executor
+  checks (!stepStarted) to know it needs to do first-tick setup (emplace
+  MoveGoalComponent, log, etc.).  Advance() resets it to false so the next
+  executor sees a fresh step on the very same tick.
+
+3.4  Step payload types
+
+  MoveToStep   { destination: Spark::Point, arrivalRadius: float }
+               Tells MoveToStepSystem where to walk to.
+
+  GatherStep   { spot: entt::entity, itemType: StringId,
+                 gatheringSpeed: int, targetQuantity: int,
+                 gathered: int, accumulator: float }
+               All fields except gathered/accumulator are cached at task
+               creation so GatherStepSystem does not need to re-read the
+               spot entity each tick.
+
+  TaskStep  =  std::variant<MoveToStep, GatherStep, DeliverStep,
+                             PickupStep, SellStep, CraftStep>
+
+3.5  Tag-based step routing  (Esc/Components/StepTags.h)
+
+  Each character entity carries exactly one zero-size tag component while a
+  task is InProgress, identifying its current step type:
+
+    MoveToStepActiveTag   GatherStepActiveTag   DeliverStepActiveTag
+    PickupStepActiveTag   SellStepActiveTag     CraftStepActiveTag
+
+  Step systems pre-filter via EnTT view intersection:
+
+    reg.view<CurrentTaskComponent, XxxStepActiveTag>()
+
+  This is O(N_chars_in_that_step) rather than O(N_all_chars), with zero
+  try_get overhead for routing.  At 100 characters the win is modest; at
+  1 000+ it becomes significant.
+
+  Tag lifecycle:
+    Applied  — TaskClaimSystem Phase C (first step on InProgress transition)
+             — MoveToStepSystem Phase B Advance() (step transition)
+             — StepTagRebuildSystem (first tick after save load)
+    Removed  — RemoveActiveStepTag() called on Done, Failed, or before
+               applying the next tag via ApplyStepTag().
+    Cleanup  — TaskCleanupSystem calls RemoveActiveStepTag() before
+               removing CurrentTaskComponent.
+
+  Helper functions in StepTags.h:
+    RemoveActiveStepTag(r, e)    — removes all six tags in one call (no-op
+                                   for absent tags).
+    ApplyStepTag(r, e, step)     — calls RemoveActiveStepTag then emplaces
+                                   the correct tag via std::visit.
+
+  Tags are NOT serialised.  StepTagRebuildSystem (priority 13) rebuilds
+  them on the first tick after a save is loaded by finding characters with
+  CurrentTaskComponent but none of the six tags, then calling ApplyStepTag
+  for each InProgress task.  On normal ticks the excluded-tag view is empty
+  so the rebuild system costs essentially nothing.
+
+3.5  TaskNoticeboard
+
+  Unchanged from the scaffold.  A shared service on TilemapWorld kept in
+  sync by entt signals.  Provides GetTasksByState(registry, state).
+  Currently one global board.  Scoped boards (per-workshop, per-region)
+  are planned for later.
+
+3.6  CurrentTaskComponent
+
+  Attached to a character entity when it claims a task.  Contains the
+  task entity handle.  Characters without this component are idle.
+  TaskCleanupSystem removes it when the task entity is destroyed.
+
+
+4.  TASK LIFECYCLE DIAGRAM
+--------------------------------------------------------------------------------
+
+  Character idle
+       |
+       v
+  [TaskClaimSystem Phase B]
+  Noticeboard queried for Posted tasks.
+  Nearest task claimed: task.state = Claimed,
+  character gets CurrentTaskComponent.
+       |
+       v
+  [TaskClaimSystem Phase C]
+  task.state = InProgress
+       |
+       v
+  +----+--------------------------------------------------+
+  |    Current step dispatch (same tick, every tick)      |
+  |                                                       |
+  |  MoveToStepSystem (priority 17)                       |
+  |    if current step == MoveToStep && !stepStarted:     |
+  |      emplace MoveGoalComponent -> PathfindingSystem   |
+  |      stepStarted = true                               |
+  |    on MoveResult::Arrived:                            |
+  |      HasMoreSteps? -> Advance() -> next step executor |
+  |      else         -> task.state = Done                |
+  |    on Blocked/Cancelled:                              |
+  |      task.state = Failed                              |
+  |                                                       |
+  |  GatherStepSystem (priority 18)                       |
+  |    if current step == GatherStep && !stepStarted:     |
+  |      stepStarted = true, log                          |
+  |    each tick:                                         |
+  |      accumulator += gatheringSpeed / 60               |
+  |      while accumulator >= 1: add item, gathered++     |
+  |    if gathered >= targetQuantity:                     |
+  |      HasMoreSteps? -> Advance() -> next step executor |
+  |      else         -> task.state = Done                |
+  +-------------------------------------------------------+
+       |
+       v
+  task.state == Done or Failed
+       |
+       v
+  [TaskCleanupSystem Phase A]
+  task entity destroyed -> noticeboard auto-unregisters
+       |
+       v
+  [TaskCleanupSystem Phase B]
+  CurrentTaskComponent removed from character
+       |
+       v
+  Character idle  (loop back to top)
+
+
+5.  SYSTEM DETAILS
+--------------------------------------------------------------------------------
+
+5.1  TaskClaimSystem  (priority 15, TimeUpdateFrequency::Tick)
+
+  Owns noticeboard signal registration (on_construct/on_destroy<TaskComponent>).
+
+  Phase A - Test task spawn (temporary scaffold)
+    Every SPAWN_INTERVAL_TICKS (600 = 10 in-game minutes), spawns a task if
+    fewer than MAX_ACTIVE_TASKS are alive.  Currently always tries to spawn a
+    Gather task if spots are available, falls back to MoveTo otherwise.
+    Will be replaced by real producers (CityAI, WorkshopSystem, NeedsSystem).
+
+  Phase B - Idle character task selection
+    Characters without CurrentTaskComponent query the noticeboard for Posted
+    tasks.  Each idle character picks the nearest by world-space distance to
+    the first step's destination (always a MoveToStep tile for current types).
+    Swap-and-pop removes the claimed task from the local list so no two
+    characters claim the same task within the same tick.
+
+  Phase C - Claimed -> InProgress
+    Kept separate from Phase B so that within one tick a task can go from
+    Posted -> Claimed -> InProgress, allowing MoveToStepSystem (priority 17)
+    to emplace MoveGoalComponent in the very same tick.
+
+5.2  MoveToStepSystem  (priority 17, TimeUpdateFrequency::Tick)
+
+  Hooks on_construct<MoveResultComponent> signal for completion detection.
+  Result captured at signal time to survive PathfindingSystem removing the
+  component before Update runs.
+
+  Phase A - Start MoveToStep
+    Finds InProgress tasks where current step is MoveToStep and !stepStarted.
+    Emplaces MoveGoalComponent on the character (kicks off pathfinding).
+    Sets stepStarted = true.
+
+  Phase B - Process completions (drains m_pendingCompletions)
+    Arrived    -> Advance() if more steps remain, else task.state = Done
+    Blocked    -> task.state = Failed  (no path to destination)
+    Cancelled  -> task.state = Failed  (MoveStopComponent abort)
+    Advance() resets stepStarted = false so the next step executor
+    picks up on this same tick.
+
+5.3  GatherStepSystem  (priority 18, TimeUpdateFrequency::Tick)
+
+  No signals needed.
+
+  Phase A/B combined - Gather and check completion (per character per tick)
+    Marks stepStarted on first tick (no setup required for gathering).
+    Adds gatheringSpeed / 60.0 to accumulator each tick.
+    Converts whole accumulator values into inventory items.
+    When gathered >= targetQuantity: Advance() or task.state = Done.
+    targetQuantity == 0 means gather indefinitely (no completion check).
+
+5.4  TaskCleanupSystem  (priority 20, TimeUpdateFrequency::Tick)
+
+  Phase A - Destroy terminal task entities
+    Collects Done/Failed entities first, then destroys them in a second pass
+    (cannot destroy while iterating an EnTT view).
+    on_destroy<TaskComponent> fires automatically, removing each from the
+    noticeboard — no manual cleanup needed.
+
+  Phase B - Remove stale CurrentTaskComponent
+    Covers two cases: task entity just destroyed (r.valid = false) or
+    task reference externally nulled (entt::null).  Removing this component
+    makes the character idle so TaskClaimSystem picks them up next tick.
+
+
+6.  FAILURE HANDLING
+--------------------------------------------------------------------------------
+
+  Failures are always terminal — there is no per-step retry or fallback branch.
+
+  Sources of failure:
+    - MoveToStep: path blocked (A* no solution) or movement cancelled
+    - External interrupt: another system (e.g. future CombatSystem) sets
+      task.state = Failed on the character's CurrentTaskComponent.task
+
+  On failure:
+    1. task.state = Failed
+    2. TaskCleanupSystem destroys the task entity next tick
+    3. CurrentTaskComponent removed from character -> character goes idle
+    4. Character picks a new task from the noticeboard next tick
+
+  "Drop inventory and flee" behaviour is NOT part of the task system.
+  It is a character response that lives in a future ThreatResponseSystem
+  which triggers independently when the character receives a threat event.
+  The task simply fails; what the character does next is a separate concern.
+
+
+7.  ADDING A NEW STEP TYPE
+--------------------------------------------------------------------------------
+
+  1. Define the step struct in TaskComponents.h:
+       struct MyStep { ... };
+
+  2. Add it to the TaskStep variant:
+       using TaskStep = std::variant<MoveToStep, GatherStep, DeliverStep,
+                                     PickupStep, SellStep, CraftStep, MyStep>;
+     Also add a STEP_TYPE_MY constant and serialise/deserialise branches in
+     TaskComponents.h alongside the existing step types.
+
+  3. Add a tag and wire it into StepTags.h (four places):
+     a. Declare the tag:
+          struct MyStepActiveTag {};
+          REGISTER_COMPONENT_TYPE_STATIC(MyStepActiveTag)
+     b. Add to RemoveActiveStepTag():
+          r.remove<..., MyStepActiveTag>(e);
+     c. Add a branch in ApplyStepTag():
+          else if constexpr (std::is_same_v<T, MyStep>)
+              { r.emplace<MyStepActiveTag>(e); }
+     d. Add to the entt::exclude list in StepTagRebuildSystem::Update().
+
+  4. Create MyStepSystem.h / MyStepSystem.cpp:
+       - Inherit IEntitySystem, choose a priority > 18 (or between existing)
+       - Pre-filter: reg.view<CurrentTaskComponent, MyStepActiveTag>()
+       - In Enqueue lambda: std::get_if<MyStep>(&stepsComp->Current()) as a
+         safety check (step may have advanced between pre-filter and Enqueue)
+       - On completion: ApplyStepTag() or task.state = Done +
+                        RemoveActiveStepTag()
+       - On failure:    task.state = Failed + RemoveActiveStepTag()
+
+  5. Register in GoCApp::Init():
+       AddEntitySystem(std::make_shared<MyStepSystem>(), TimeUpdateFrequency::Tick);
+
+  6. Add the new .cpp / .h to goc.vcxproj (ClCompile + ClInclude).
+
+  No other files need changing.  TaskClaimSystem, TaskCleanupSystem, and
+  TaskNoticeboard are fully step-type agnostic.
+
+
+8.  FILE INVENTORY
+--------------------------------------------------------------------------------
+
+  Modified (original multi-step task work):
+    Esc/Components/TaskComponents.h     Added TaskType::Gather; replaced
+                                        MoveToTaskComponent with MoveToStep,
+                                        GatherStep, TaskStep variant,
+                                        TaskStepsComponent
+    GoCApp.cpp                          Replaced MoveToTaskSystem with focused
+                                        per-step systems; added StepTagRebuildSystem
+    Esc/Systems/TaskNoticeboard.h       Updated signal ownership comment
+    goc.vcxproj                         Added new systems, removed old one
+
+  New (original multi-step task work):
+    Esc/Systems/TaskClaimSystem.h/.cpp  Priority 15 — claim + noticeboard
+    Esc/Systems/MoveToStepSystem.h/.cpp Priority 17 — walk step executor
+    Esc/Systems/GatherStepSystem.h/.cpp Priority 18 — gather step executor
+    Esc/Systems/TaskCleanupSystem.h/.cpp Priority 20 — destroy + idle
+
+  New (tag-based step routing, May 2026):
+    Esc/Components/StepTags.h           Six ActiveTag structs, REGISTER macros,
+                                        RemoveActiveStepTag(), ApplyStepTag()
+    Esc/Systems/StepTagRebuildSystem    Priority 13 — post-load tag recovery;
+      .h / .cpp                         near-zero cost on normal ticks
+
+  Removed:
+    Esc/Systems/MoveToTaskSystem.h/.cpp Replaced by the focused systems above
+
+
+9.  STABLEID USAGE
+--------------------------------------------------------------------------------
+
+  Task.id             PackedId (StableId) via GameEntityComponent.
+                      Used in all log output.  Survives save/load.
+  Task.claimedBy      entt::entity.  Runtime-only, rebuilt on claim.
+  Task.postedBy       entt::entity.  Runtime-only for now.
+                      TODO: become StableId when WorkshopSystem posts real tasks.
+  GatherStep.spot     entt::entity.  Runtime-only reference to gathering spot.
+                      TODO: needs StableId translation for serialisation.
+  CurrentTask.task    entt::entity.  Runtime-only.
+  Noticeboard index   entt::entity handles.  Rebuilt from registry on load.
+
+
+10. WHAT IS NOT BUILT YET
+--------------------------------------------------------------------------------
+
+  - TaskStepsComponent serialisation (variant + entity refs need custom operators)
+  - Scoped noticeboards (per-workshop, per-region, personal needs)
+  - Utility scoring for task selection (trait/skill modifiers, weights)
+  - Task timeouts or reservation expiry
+  - Inventory capacity limit for "fill inventory" completion condition
+  - Team tasks (multi-NPC coordination on a single task)
+  - UI for decision logs (console logging via "esc.task" channel only)
+  - Real task producers (CityAI, NeedsSystem) — WorkshopSystems already posts
+  - Interrupt handling via external systems (CombatSystem, ThreatSystem)
+  - PickupStep GameEntity source path (sourceGameId branch) needs a real
+    producer before it can be fully tested — see FUTURE-TESTING NOTE in
+    PickupStepSystem.cpp
+
+
+11. HOW TO TEST
+--------------------------------------------------------------------------------
+
+  1. Build and run with the test world loaded.
+
+  2. The world must have at least one BerryGatheringSpotComponent or
+     WoodGatheringSpotComponent entity for Gather tasks to spawn.
+     If none exist, all spawned tasks will be MoveTo fallbacks.
+
+  3. Characters with CharacterComponent + PathfindingComponent +
+     TransformComponent + InventoryComponent will automatically pick up tasks.
+
+  4. Watch console logs (channel "esc.task") for:
+       "Task posted: Gather"   new gather task created at a spot
+       "Task posted: MoveTo"   fallback walk-to-random-tile task
+       "Task claimed"          character picked nearest task
+       "Task InProgress"       claim transition complete
+       "MoveToStep started"    pathfinding kicked off toward spot
+       "MoveToStep done"       arrived, advancing to GatherStep
+       "GatherStep started"    character began accumulating items
+       "Task DONE"             all steps complete
+       "Task FAILED (Blocked)" path to spot was unreachable
+       "Task FAILED (Cancel)"  movement was externally stopped
+
+  5. Verify that after a Gather task completes, the character's
+     InventoryComponent contains the expected itemType and quantity.
+
+  6. Verify that failed tasks are cleaned up and characters go idle
+     and pick a new task on the next tick.

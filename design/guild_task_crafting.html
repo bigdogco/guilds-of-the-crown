@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guild — Crafting Flow</title>
+  <link rel="stylesheet" href="../assets/theme.css" />
+  <link rel="stylesheet" href="../assets/nav.css" />
+  <style>
+    body { font-family: sans-serif; background: var(--bg); margin: 0; padding: 48px 16px; color: var(--text); line-height: 1.65; }
+    .page { max-width: 960px; margin: 0 auto; }
+    h1 { font-size: 22px; font-weight: 500; color: var(--text); margin: 0 0 6px 0; }
+    h2 { font-size: 18px; font-weight: 500; color: var(--text); margin: 28px 0 6px 0; scroll-margin-top: 24px; }
+    h3 { font-size: 15px; font-weight: 500; color: var(--text); margin: 20px 0 8px 0; }
+    p { font-size: 13px; color: var(--text); margin: 0 0 10px 0; }
+    .subtitle { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+    .meta { font-size: 11px; color: var(--muted); letter-spacing: 0.05em; margin-bottom: 40px; }
+    .section { margin-bottom: 48px; }
+    .section-label { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px 0; font-size: 13px; }
+    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text); }
+    th { font-weight: 500; background: var(--panel); }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: rgba(0,0,0,0.1); padding: 1px 5px; border-radius: 3px; color: var(--text); }
+    pre { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-size: 12px; line-height: 1.55; color: var(--text); margin: 12px 0 16px 0; }
+    pre code { background: transparent; padding: 0; color: inherit; font-size: inherit; }
+    .callout { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; margin: 16px 0; }
+    .callout-purple { border-left: 3px solid #534AB7; border-radius: 0 8px 8px 0; }
+    .callout-teal { border-left: 3px solid #0F6E56; border-radius: 0 8px 8px 0; }
+    .callout-amber { border-left: 3px solid #854F0B; border-radius: 0 8px 8px 0; }
+    .callout-coral { border-left: 3px solid #993C1D; border-radius: 0 8px 8px 0; }
+    .callout-label { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+    .callout-purple .callout-label { color: #534AB7; }
+    .callout-teal .callout-label { color: #0F6E56; }
+    .callout-amber .callout-label { color: #854F0B; }
+    .callout-coral .callout-label { color: #993C1D; }
+    ul, ol { font-size: 13px; color: var(--text); margin: 0 0 12px 0; padding-left: 22px; }
+    li { margin-bottom: 4px; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+  </style>
+</head>
+<body>
+<div id="content">
+<div class="page">
+
+  <h1>Crafting Flow — Design &amp; Implementation Notes</h1>
+  <p class="subtitle">CraftStep + CraftStepSystem, workshop crafting brain (May 2026)</p>
+  <p class="meta">DESIGN NOTE · CRAFTING SYSTEM</p>
+
+  <div class="section">
+    <h2>1. Purpose</h2>
+    <p>Workshops convert raw materials they hold in their InventoryComponent into finished crafted goods (sword, staff, bread, health_potion, ...). Crafting:</p>
+    <ul>
+      <li>is performed BY a worker (DynastyMember of the workshop) AT the workshop</li>
+      <li>consumes whole-number quantities of materials per item produced</li>
+      <li>takes hours of in-game time per item, scaled by the worker's handcraft</li>
+      <li>cohabits with the existing Gather+Deliver flow on the same worker pool</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>2. Architecture Overview</h2>
+    <pre><code>PRODUCERS                         NOTICEBOARD              CONSUMERS
+---------                         -----------              ---------
+
+AlchemyShopSystem  (Minute) ───\
+CarpenterShopSystem (Minute) ──→ TaskNoticeboard  →  TaskClaimSystem
+                                  (workshop-scoped)     (idle workers)
+                                        ^
+                                        |
+                            on_construct&lt;TaskComponent&gt;</code></pre>
+    <p>Each shop system runs PostWorkshopTasks once per workshop per spawn interval (currently 600 ticks = 10 in-game minutes). For each free worker slot it asks:</p>
+    <ul>
+      <li><strong>Can I craft something?</strong> any craft_item with all materials &ge; 50? → Post Craft task</li>
+      <li><strong>Otherwise:</strong> Post Gather+Deliver task (existing flow, unchanged)</li>
+    </ul>
+
+    <h3>Step Execution Flow (worker who claimed a Craft task)</h3>
+    <pre><code>Priority 17                   16                              20
++------------------+   +------------------+   +------------------+
+| MoveToStepSystem |   | CraftStepSystem  |   | TaskCleanupSystem|
+| walk to workshop |   | accumulate +     |   | destroy Done /   |
+|                  |   |   produce items  |   |   Failed task    |
++------------------+   +------------------+   +------------------+
+      Tick                   Minute                  Tick</code></pre>
+    <p>CraftStepSystem priority is 16 (between TaskClaim 15 and MoveToStep 17), but it runs at Minute frequency, so it does not race with per-tick step executors.</p>
+  </div>
+
+  <div class="section">
+    <h2>3. Components Introduced</h2>
+
+    <h3>3.1 WorkshopCraftingComponent (BuildingComponents.h)</h3>
+    <pre><code>struct WorkshopCraftingComponent {
+    std::vector&lt;StringId&gt; craftItems;  // DB paths of craftables
+};</code></pre>
+    <p>Runtime-only — NOT serialised. Emplaced/refreshed/removed by Database::SetupBuildingLevelData on every level init based on the current level's craft_items array.</p>
+
+    <h3>3.2 CraftStep (TaskComponents.h)</h3>
+    <pre><code>struct CraftStep {
+    StringId itemType{};            // DB path of the item to craft
+    float craftHoursPerItem = 1.0f; // from item's craftTime, cached
+    float accumulator = 0.f;       // progress to next item [0, 1)
+    int   crafted = 0;             // total produced this step
+    entt::entity workshop = entt::null;    // runtime handle (not serialised)
+    int   workshopObjectId = 0;            // ObjectEntityComponent.id (serialised)
+};</code></pre>
+    <p>Save/load uses Option B dual-field: workshop is rebuilt from workshopObjectId in TilemapWorld::LoadEntities; workshopObjectId is the persistent companion. accumulator is serialised so in-flight progress survives save/load.</p>
+
+    <h3>3.3 TaskType::Craft</h3>
+    <p>New value in the TaskType enum. Used for task counting and noticeboard filtering — Craft tasks are NOT redirected to the city like Hire tasks; they stay on the workshop's own board.</p>
+  </div>
+
+  <div class="section">
+    <h2>4. Data / DB Shape</h2>
+
+    <h3>4.1 Item Entry</h3>
+    <pre><code>"sword": {
+    "name":       "Sword",
+    "category":   "crafted_weapon",
+    "stackLimit": 10,
+    "baseValue":  80,
+    "craftTime":  3,                                       // HOURS per item
+    "materials": [
+        { "item_type": "items/raw/wood",       "quantity": 10 },
+        { "item_type": "items/raw/iron_ingot", "quantity": 10 }
+    ]
+}</code></pre>
+    <p>craftTime is interpreted as "in-game hours required to craft one unit at baseline skill (handcraft = 10)". bread=1, staff=2, sword=3.</p>
+
+    <h3>4.2 Workshop Level Entry</h3>
+    <pre><code>"levels": {
+    "1": {
+        ...
+        "craft_items": [
+            "items/crafted/staff",
+            "items/crafted/sword"
+        ],
+        ...
+    }
+}</code></pre>
+    <p>Each entry is a full DB path (string). The workshop "knows how to make" exactly the items in this list at its current level.</p>
+  </div>
+
+  <div class="section">
+    <h2>5. Crafting Speed Formula</h2>
+    <p>CraftStepSystem runs once per game minute and adds to the accumulator:</p>
+    <pre><code>itemsPerMinute = (handcraft * 0.1) / (craftHoursPerItem * 60)</code></pre>
+
+    <h3>Worked Examples (handcraft = 10)</h3>
+    <table>
+      <thead><tr><th>Item</th><th>craftTime</th><th>Rate</th><th>Items/Hour</th></tr></thead>
+      <tbody>
+        <tr><td>bread</td><td>1</td><td>1.0 / 60 = 0.0167 items/min</td><td>1</td></tr>
+        <tr><td>staff</td><td>2</td><td>1.0 / 120 = 0.0083 items/min</td><td>0.5</td></tr>
+        <tr><td>sword</td><td>3</td><td>1.0 / 180 = 0.0056 items/min</td><td>0.333</td></tr>
+      </tbody>
+    </table>
+    <p>At handcraft = 20 (twice as skilled), all rates double. At handcraft = 5, they halve. No diminishing returns — the formula is a straight scalar.</p>
+    <p>Granularity: Minute-tick is sufficient because items take hours to produce; worst-case timing error is &lt; 1 game-minute.</p>
+  </div>
+
+  <div class="section">
+    <h2>6. Workshop Task-Posting Logic</h2>
+    <p>PostWorkshopTasks runs once per workshop per spawn-interval tick (currently 600 ticks = 10 in-game minutes):</p>
+    <ol>
+      <li>Count current workers, pending Hire tasks, and active non-Hire tasks.</li>
+      <li>Post Hire tasks for any open worker slots.</li>
+      <li>Compute workTasksToPost = workerCount - activeWorkTasks.</li>
+      <li>For each free work slot:
+        <ol>
+          <li>Look up WorkshopCraftingComponent and InventoryComponent on the workshop entity.</li>
+          <li>Iterate craftItems. For each, read its materials map from the DB.</li>
+          <li><strong>HasMaterialsAboveThreshold?</strong> Every required material present at &ge; CRAFT_MATERIAL_THRESHOLD (50)?
+            <ul>
+              <li>YES: post Craft task with steps [MoveToStep(workshop), CraftStep] — break, one craft task per slot iteration.</li>
+              <li>NO: fall through to gather.</li>
+            </ul>
+          </li>
+          <li>Gather fallback: if there are gathering spots and no craft was posted, post the existing Gather+Deliver task.</li>
+        </ol>
+      </li>
+    </ol>
+    <p>The check is "any one craftable item has full materials". As long as that is true, the workshop posts crafting tasks; once materials drop below the threshold for every craftable item, it goes back to gathering.</p>
+  </div>
+
+  <div class="section">
+    <h2>7. CraftStepSystem Execution</h2>
+    <p>Once per game minute, for every character with CurrentTaskComponent + CharacterAttributesComponent whose current step is a CraftStep:</p>
+    <ol>
+      <li><strong>First-tick handshake:</strong> Set stepsComp→stepStarted = true. Resolve craftStep.workshop from workshopObjectId if null. If the workshop entity is invalid → task.state = Failed. If the workshop has no InventoryComponent → task.state = Failed.</li>
+      <li><strong>Accumulate progress:</strong> accumulator += (handcraft * 0.1) / (craftHoursPerItem * 60)</li>
+      <li><strong>Item production loop</strong> (while accumulator &ge; 1.0):
+        <ul>
+          <li>accumulator -= 1.0</li>
+          <li>Read fresh materials list from item DB.</li>
+          <li>Check each material is still available at required quantity in workshop inventory. If not → task.state = Done, break out of loop.</li>
+          <li>Deduct materials in whole numbers; erase fully-consumed stacks.</li>
+          <li>Add one of craftStep.itemType to the workshop inventory.</li>
+          <li>++craftStep.crafted (logging only).</li>
+        </ul>
+      </li>
+    </ol>
+    <p>Materials are deducted PER COMPLETED ITEM, never up-front. This guarantees: inventory never holds fractional items; task cancellation/failure mid-accumulation needs no refund logic; if a higher-priority concern empties the workshop's stock between items, the next item simply fails the materials check and the task ends cleanly.</p>
+  </div>
+
+  <div class="section">
+    <h2>8. Task Lifecycle (Worker's Perspective)</h2>
+    <pre><code>Worker idle, employed at workshop W
+    |
+    v
+[TaskClaimSystem] picks up a Craft task posted by W
+    |
+    v
+[MoveToStepSystem, priority 17, Tick]
+    Step 0 = MoveToStep(workshopTile)
+    Walk to workshop. When arrived, Advance() to step 1.
+    |
+    v
+[CraftStepSystem, priority 16, Minute]
+    Step 1 = CraftStep
+    Each minute: accumulate, possibly produce item(s).
+    Loop until either:
+      - materials exhausted → task.state = Done
+      - external interrupt fails → task.state = Failed
+    |
+    v
+[TaskCleanupSystem, priority 20, Tick]
+    Destroy task entity.
+    Remove worker's CurrentTaskComponent → idle again.
+    |
+    v
+Next workshop minute tick: AlchemyShopSystem / CarpenterShopSystem
+re-evaluates. If materials are still above threshold, posts another
+Craft task. Otherwise, posts a Gather+Deliver task.</code></pre>
+  </div>
+
+  <div class="section">
+    <h2>9. Gather vs Craft Interaction</h2>
+    <ul>
+      <li>Both phases share the same workTasksToPost budget — a workshop NEVER posts more total work tasks than it has workers, regardless of mix.</li>
+      <li><strong>materials &lt; 50 of any required item</strong> → craft skipped, gather posted</li>
+      <li><strong>materials &ge; 50 of every required</strong> → craft posted, gather skipped</li>
+      <li><strong>no gathering spots AND can't craft</strong> → worker stays idle this interval</li>
+    </ul>
+    <p>Because the shop system runs every 10 in-game minutes and CraftStepSystem runs every minute, a worker that finishes a craft task can be back on the noticeboard for ~10 minutes before a new task is queued.</p>
+  </div>
+
+  <div class="section">
+    <h2>10. Adding a New Craftable Item</h2>
+    <ol>
+      <li>Add the item entry under <code>data/database/items/crafted/desc.json</code> with: name, category, stackLimit, baseValue, craftTime (hours per unit at baseline skill), materials (map: source DB path → required quantity).</li>
+      <li>List its full DB path in the desired workshop's level "craft_items".</li>
+      <li>Rebuild — DBIds.h is regenerated by tools/gen_db_ids.py.</li>
+    </ol>
+    <p><strong>No code changes required.</strong> The crafting system is data-driven for items.</p>
+    <p>To make a NEW kind of workshop able to craft: define its component, add a SmithySystem mirroring AlchemyShopSystem/CarpenterShopSystem, register both in GoCApp::Init(), populate craft_items in its DB level entries.</p>
+  </div>
+
+  <div class="section">
+    <h2>11. File Inventory</h2>
+    <h3>Modified:</h3>
+    <ul>
+      <li>Utils/Tags.h — +craft_items, craft_time, materials, craft_hours_per_item, craft_workshop_id</li>
+      <li>Esc/Components/BuildingComponents.h — +WorkshopCraftingComponent</li>
+      <li>Esc/Components/TaskComponents.h — +TaskType::Craft, +CraftStep struct + variant entry, +STEP_TYPE_CRAFT + serialisation, +to_string cases</li>
+      <li>Game/DB/Database.cpp — Reads craft_items in SetupBuildingLevelData</li>
+      <li>GoCApp.cpp — +CraftStepSystem + WorkshopSystems + GatheringSpotSystem registrations / includes</li>
+    </ul>
+    <h3>New:</h3>
+    <ul>
+      <li>Esc/Systems/CraftStepSystem.h/.cpp — CraftStepSystem impl (Minute frequency). Log channel: esc.craft</li>
+      <li>Esc/Systems/BuildingUtils.h — Header-only crafting helpers: CRAFT_MATERIAL_THRESHOLD = 50, struct CraftItemData, ReadCraftItemData, HasMaterialsAboveThreshold</li>
+      <li>Esc/Systems/WorkshopSystems.h — AlchemyShopSystem and CarpenterShopSystem declarations (extracted from BuildingSystems.h)</li>
+      <li>Esc/Systems/WorkshopSystems.cpp — PostWorkshopTasks template + two workshop Update implementations. Log channel: esc.workshop</li>
+      <li>Esc/Systems/GatheringSpotSystem.h — GatheringSpotSystem declaration (extracted from BuildingSystems.h)</li>
+      <li>Esc/Systems/GatheringSpotSystem.cpp — GatheringSpotSystem impl. Log channel: esc.gathering</li>
+    </ul>
+    <h3>Result of the split:</h3>
+    <p>BuildingSystems.h/.cpp now only carry the generic building lifecycle — BuildingSystem, HouseSystem, BuildingUpgradeSystem. Workshop, gathering-spot, and crafting concerns each live in their own file.</p>
+  </div>
+
+  <div class="section">
+    <h2>12. StableId / ID Usage</h2>
+    <ul>
+      <li>CraftStep.workshop — entt::entity, runtime-only</li>
+      <li>CraftStep.workshopObjectId — int (Tiled object GUID), serialised. Resolved via GetObjectById()→getEntityId(). NOT a PackedId — workshops are tilemap objects, not GameEntity stable ids.</li>
+      <li>TaskComponent.postedBy — Workshop entity (existing pattern)</li>
+      <li>TaskComponent.postedById — Workshop ObjectEntityComponent.id</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>13. What Is Not Built Yet</h2>
+    <ul>
+      <li>Quality / variant items (every sword is identical)</li>
+      <li>Multi-output recipes (one craft = one item type only)</li>
+      <li>Crafting XP / handcraft progression for the worker</li>
+      <li>Workshop-specialised modifiers (e.g. master smith bonus on swords)</li>
+      <li>Material substitutions (alternative recipes)</li>
+      <li>Marketplace consumption of crafted goods (Marketplace exists as stub only)</li>
+      <li>Inventory capacity limits on workshops (a workshop can stockpile unlimited swords today)</li>
+      <li>Save/load reconstruction of CraftStep.workshop — needs the same Option B pattern as GatherStep.spot</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>14. How to Test</h2>
+    <ol>
+      <li>Place at least one carpenter_shop or alchemy_shop in the test world, assign a dynasty, and let it hire workers.</li>
+      <li>Let workers gather wood / berries until the workshop's InventoryComponent shows &ge; 50 of each required material.</li>
+      <li>On the next workshop spawn tick (every 10 in-game minutes), watch channel "esc.workshop" for: "CarpenterShop &lt;N&gt; posted Craft 'items/crafted/staff' task."</li>
+      <li>Watch channel "esc.craft" for: "CraftStep started: Task StableId=... item='items/crafted/staff' craftHours=2", then "Crafted 1x 'items/crafted/staff' (total this step: 1) StableId=...", then "CraftStep: materials exhausted after N items - task Done."</li>
+      <li>Verify the workshop's InventoryComponent now contains crafted items and consumed raw materials are gone.</li>
+      <li>Verify the workshop returns to posting Gather tasks once materials dip below threshold for every craftable item.</li>
+    </ol>
+  </div>
+
+</div>
+</div>
+<script src="../assets/nav.js"></script>
+</body>
+</html>

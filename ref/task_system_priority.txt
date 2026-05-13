@@ -1,0 +1,226 @@
+System Execution Priority Reference
+=====================================
+Lower number = runs first.
+All systems listed here use TimeUpdateFrequency::Tick unless noted.
+
+Priority |  System                   | Update Frequency | Notes
+---------|---------------------------|------------------|-----------------------------------------------
+   0     |  MarketplaceSystem        | Tick             | Stub system; emplaces InventoryComponent and TransformComponent
+         |                           |                  | on construction of MarketplaceComponent.  Update is empty
+         |                           |                  | (consumption / restocking flow not built yet).
+   9     |  BuildingSystem           | Tick             | Generic building init; on_construct for all building types.
+         |                           |                  | Adds InventoryComponent to every building.  SetupBuildingLevelData
+         |                           |                  | also emplaces / refreshes WorkshopCraftingComponent for any
+         |                           |                  | level that lists craft_items.
+         |  GatheringSpotSystem      | Tick             | Also priority 9. Resolves GatheringSpotInitComponent
+         |                           |                  | (sets name/itemType/gatheringSpeed from DB).
+         |                           |                  | Lives in its own file (GatheringSpotSystem.h/.cpp).
+  10     |  HouseSystem              | Tick             | House-specific logic.
+         |  BuildingUpgradeSystem    | Tick             | Also priority 10. Handles level-up transitions.
+         |  InventorySystem          | Tick             | Also priority 10. Item/inventory bookkeeping.
+         |  GroundItemSystem         | Tick             | Also priority 10. Dropped item handling.
+  11     |  AlchemyShopSystem        | Tick             | Posts Hire + Sell / Craft / Gather+Deliver tasks (berry
+         |                           |                  | resources, alchemy crafted goods).  Per worker slot decision
+         |                           |                  | order: Sell (any item stack >= stackLimit) -> Craft (materials
+         |                           |                  | >= 50) -> Gather (fallback).
+         |                           |                  | Only posts if workshop has DynastyWorkshopComponent.
+  12     |  CarpenterShopSystem      | Tick             | Posts Hire + Sell / Craft / Gather+Deliver tasks (wood
+         |                           |                  | resources, carpenter crafted goods).  Same logic as
+         |                           |                  | AlchemyShopSystem.
+         |                           |                  | Only posts if workshop has DynastyWorkshopComponent.
+  13     |  StepTagRebuildSystem      | Tick             | Post-load tag recovery.  Views characters with
+         |                           |                  | CurrentTaskComponent but none of the six ActiveTags
+         |                           |                  | (entt::exclude<all_6_tags>).  On normal ticks that
+         |                           |                  | excluded-tag view is empty — near-zero cost.  On the
+         |                           |                  | first tick after a save load it finds all InProgress
+         |                           |                  | characters missing their tags and calls ApplyStepTag
+         |                           |                  | for each.  Must run before TaskClaimSystem (15) so
+         |                           |                  | newly restored characters are tag-correct before any
+         |                           |                  | new claims land.  See StepTags.h for tag definitions.
+  14     |  TaskFailureRecoverySystem | Tick            | Hooks on_destroy<TaskComponent> (lightweight signal):
+         |                           |                  | Failed Sell tasks push the worker entity into a pending
+         |                           |                  | queue.  Update drains the queue and posts ReturnGoods
+         |                           |                  | tasks onto the worker's personal noticeboard, so unsold
+         |                           |                  | items get walked back to the workshop.  Priority 14
+         |                           |                  | guarantees Update runs BEFORE TaskClaim (15) the tick
+         |                           |                  | after the failure, so the recovery task is claimable
+         |                           |                  | immediately.  Log channel: esc.recovery
+  15     |  TaskClaimSystem          | Tick             | Phase A: spawns test tasks (Gather+Deliver / Gather / MoveTo).
+         |                           |                  | Phase B: idle characters claim nearest Posted task.
+         |                           |                  | Phase C: advances Claimed tasks to InProgress.
+  16     |  PathfindingSystem        | Tick             | Picks up MoveGoalComponent; runs A* and emits path.
+         |  CraftStepSystem          | Minute           | Also priority 16 (Minute frequency).  Executes CraftStep —
+         |                           |                  | each minute accumulates progress at
+         |                           |                  | itemsPerMinute = (handcraft * 0.1) / (craftHoursPerItem * 60),
+         |                           |                  | deducts whole-number materials from workshop inventory and
+         |                           |                  | adds the crafted item when accumulator passes 1.0.  When
+         |                           |                  | materials run out, marks task Done.
+  17     |  MoveToStepSystem         | Tick             | Executes MoveToStep — emplaces MoveGoalComponent on step
+         |                           |                  | start, advances/fails on MoveResultComponent signal.
+  18     |  GatherStepSystem         | Tick             | Executes GatherStep — accumulates items into character
+         |                           |                  | inventory at gatheringSpeed rate; stops at targetQuantity.
+  19     |  DeliverStepSystem        | Tick             | Executes DeliverStep — instant one-tick transfer from
+         |                           |                  | character inventory to the target's InventoryComponent.
+         |                           |                  | Target may be a Tiled building (targetObjectId) or a
+         |                           |                  | runtime GameEntity (targetGameId, e.g. dynasty).  Lazy-
+         |                           |                  | resolves the runtime handle from whichever id is non-zero.
+         |  PickupStepSystem         | Tick             | Also priority 19.  Mirror of DeliverStepSystem — items flow
+         |                           |                  | source -> worker.  Source may be Tiled (sourceObjectId) or
+         |                           |                  | GameEntity (sourceGameId, reserved).  Fails the task if the
+         |                           |                  | source has less than the requested quantity.
+         |  SellStepSystem           | Tick             | Also priority 19.  Executes SellStep — atomic exchange at
+         |                           |                  | the buyer (items worker->buyer, gold buyer->worker).
+         |                           |                  | UnlimitedGoldComponent on the buyer skips gold deduction
+         |                           |                  | (marketplace pays from thin air).  Pre-check / commit
+         |                           |                  | pattern keeps the swap atomic.
+         |  DynastySystem            | Tick             | Also priority 19. Three phases:
+         |                           |                  | Phase A: rebuilds runtime entity handles from PackedIds
+         |                           |                  |          (run on DynastyInitComponent entities; also fixes
+         |                           |                  |          DynastyMemberComponent/DynastyWorkshopComponent
+         |                           |                  |          back-pointers in the same pass).
+         |                           |                  | Phase B: finalises NPC membership when a Hire task is Done
+         |                           |                  |          (emplaces DynastyMemberComponent before cleanup).
+         |                           |                  | Phase C: posts HireWorker tasks (TaskType::Hire) for
+         |                           |                  |          dynasty-owned workshops with open member slots.
+         |                           |                  | Must run before TaskCleanupSystem (20) so Done hire tasks
+         |                           |                  | are still alive during Phase B.
+  20     |  TaskCleanupSystem        | Tick             | Also CameraSystem (priority 20, every frame).
+         |                           |                  | Destroys Done/Failed task entities; removes
+         |                           |                  | CurrentTaskComponent from the character.
+---------|---------------------------|------------------|-----------------------------------------------
+  79     |  DebugRotationSystem      | (frame)          | Spins debug entities.
+  80     |  DebugTileProfilingSystem | (frame)          | Tile profiling overlay.
+  85     |  DebugRenderSystem        | (frame)          | Debug draw (shapes, paths, etc.).
+  86     |  DebugEntitySystem        | (frame)          | ImGui entity inspector panel.
+  90     |  TileSpriteRenderSystem   | (frame)          | Renders tilemap sprites.
+ 100     |  BasicSpriteRenderSystem  | (frame)          | Renders entity sprites.
+ 150     |  CharacterSystem          | (frame)          | Character animation / visual state.
+ 200     |  BasicEntitySystem        | (frame)          | Assigns StableIds via GameEntityComponent on_construct.
+
+
+Task Step Execution Order (within a single task)
+=================================================
+A 4-step Gather+Deliver task runs in this sequence:
+
+  Step 0 — MoveToStep      (MoveToStepSystem,  priority 17)  Walk to gathering spot.
+  Step 1 — GatherStep      (GatherStepSystem,  priority 18)  Gather items into character inventory.
+  Step 2 — MoveToStep      (MoveToStepSystem,  priority 17)  Walk to target workshop.
+  Step 3 — DeliverStep     (DeliverStepSystem, priority 19)  Transfer items to building inventory.
+
+A HireWorker task (posted by DynastySystem) runs in this sequence:
+
+  Step 0 — MoveToStep      (MoveToStepSystem,  priority 17)  Walk to dynasty workshop.
+           On Done: DynastySystem (priority 19) emplaces DynastyMemberComponent on the NPC.
+
+A Craft task (posted by AlchemyShopSystem / CarpenterShopSystem) runs in this sequence:
+
+  Step 0 — MoveToStep      (MoveToStepSystem,  priority 17)  Walk to the workshop tile.
+  Step 1 — CraftStep       (CraftStepSystem,   priority 16)  Each minute, accumulate
+                                                             progress; on accumulator >= 1.0
+                                                             deduct materials from workshop
+                                                             InventoryComponent and add the
+                                                             crafted item.  Marks task Done
+                                                             when materials run out.
+
+A Sell task (posted by AlchemyShopSystem / CarpenterShopSystem) runs in this 6-step sequence:
+
+  Step 0 — MoveToStep      (MoveToStepSystem,  priority 17)  Walk to the workshop tile.
+  Step 1 — PickupStep      (PickupStepSystem,  priority 19)  Take stackLimit items from
+                                                             workshop -> worker inventory.
+  Step 2 — MoveToStep      (MoveToStepSystem,  priority 17)  Walk to the marketplace tile.
+  Step 3 — SellStep        (SellStepSystem,    priority 19)  Atomic exchange: items
+                                                             worker -> buyer; gold buyer ->
+                                                             worker.  UnlimitedGoldComponent
+                                                             on the buyer skips gold deduction.
+  Step 4 — MoveToStep      (MoveToStepSystem,  priority 17)  Walk back to the workshop tile.
+  Step 5 — DeliverStep     (DeliverStepSystem, priority 19)  Deposit all gold from the worker
+                                                             into the workshop's owning DYNASTY
+                                                             entity (targetGameId path — dynasty
+                                                             has no Tiled object).
+
+A ReturnGoods task (posted by TaskFailureRecoverySystem on the worker's personal
+noticeboard after a Sell task fails) runs in this 2-step sequence:
+
+  Step 0 — MoveToStep      (MoveToStepSystem,  priority 17)  Walk to the workshop tile.
+  Step 1 — DeliverStep     (DeliverStepSystem, priority 19)  Deliver EVERY stack the worker
+                                                             carries to the workshop
+                                                             (itemType empty + quantity=0).
+                                                             Target uses targetObjectId — workshop
+                                                             is a Tiled building.
+
+Fallback task shapes:
+  2-step  — MoveToStep + GatherStep        (no workshops present)
+  1-step  — MoveToStep only               (no gathering spots present)
+
+
+Key Design Notes
+================
+- Tag-based step routing (May 2026): each character entity carries exactly one
+  zero-size tag (MoveToStepActiveTag, GatherStepActiveTag, DeliverStepActiveTag,
+  PickupStepActiveTag, SellStepActiveTag, CraftStepActiveTag) while a task is
+  InProgress.  Step systems pre-filter via EnTT view intersection:
+    reg.view<CurrentTaskComponent, XxxStepActiveTag>()
+  This gives O(N_chars_in_that_step) iteration instead of O(N_all_chars) with
+  try_get routing — the difference is especially large when most characters are
+  in different steps.  Tags are managed by ApplyStepTag() / RemoveActiveStepTag()
+  in StepTags.h.  Inside the Enqueue lambda each system still does a std::get_if
+  safety check because the step may advance between pre-filter and mutation.
+- Tags are NOT serialised.  StepTagRebuildSystem (priority 13) restores them on
+  the first tick after a save load.  See task_system.txt §3.5 for full details.
+- stepStarted guards one-shot setup (e.g. emplace MoveGoalComponent, trigger transfer).
+  TaskStepsComponent::Advance() resets stepStarted so the next executor picks up
+  immediately on the same tick.
+- TaskClaimSystem (15) runs before PathfindingSystem (16) so a task claimed and
+  set to InProgress in the same tick immediately gets a pathfinding goal.
+- DeliverStepSystem (19) runs after GatherStepSystem (18) so on the tick
+  MoveToStepSystem advances past the walk-to-workshop step, DeliverStep is
+  picked up and completed in the same tick.
+- DynastySystem (19) runs after all step systems so Done hire tasks are still
+  alive for membership finalisation, and before TaskCleanupSystem (20) destroys them.
+- AlchemyShopSystem and CarpenterShopSystem only post work tasks for workshops
+  that carry DynastyWorkshopComponent. Independent workshops stay silent.
+- Both workshop systems (and their shared PostWorkshopTasks template) live in
+  WorkshopSystems.cpp; BuildingSystems.cpp now only carries the generic building
+  lifecycle (BuildingSystem, HouseSystem, BuildingUpgradeSystem).
+- Workshop systems prefer Sell -> Craft -> Gather in that order:
+    1. Sell: any crafted-item stack >= its DB stackLimit?  Post a 6-step Sell
+       task that takes one full stack to the nearest marketplace and deposits
+       the proceeds into the OWNING DYNASTY's inventory (DeliverStep target via
+       targetGameId).  Helpers in BuildingUtils.h: ItemSaleData / ReadItemSaleData.
+    2. Craft: any craftable with all materials >= CRAFT_MATERIAL_THRESHOLD (50)?
+       Post a Craft task.  Helpers: CraftItemData / ReadCraftItemData /
+       HasMaterialsAboveThreshold.
+    3. Gather: fallback Gather+Deliver task.
+  All three phases share the same activeWorkTasks budget — no overlap per worker.
+- CraftStepSystem runs at Minute frequency rather than Tick — items are produced
+  on the order of game-hours, so once-per-minute granularity is sufficient.
+- Gold is a normal DB item (items/currency/gold).  It moves through DeliverStep /
+  PickupStep like anything else.  Marketplaces carry UnlimitedGoldComponent so
+  TryDeductGold skips them when paying; they still receive gold in DeliverStep
+  if anyone delivers to them.
+- DeliverStep and PickupStep use a dual-id pattern for target/source: a Tiled
+  GUID (*ObjectId) for buildings, OR an id_index of GameEntityComponent.id
+  (*GameId) for runtime GameEntities (dynasty, city, ...).  Exactly one is
+  non-zero per step instance.  Mirrors the pattern from TaskComponent.postedBy.
+- Failure recovery for Sell tasks lives in TaskFailureRecoverySystem (pri 14).
+  It uses on_destroy<TaskComponent> to capture the worker entity from a
+  Failed Sell task, then in its next Update posts a ReturnGoods task onto
+  the worker's PERSONAL noticeboard (NoticeboardSystem routes by postedBy;
+  setting postedBy=worker is enough — no routing change needed).  The
+  personal NoticeboardComponent is auto-created via get_or_emplace on first
+  task posted to it.  See task_selling.txt §10 for policy details.
+
+Dynasty Membership Lifecycle
+=============================
+  DynastySystem posts HireWorker task  →  TaskClaimSystem (NPC claims it)
+  →  MoveToStepSystem walks NPC to workshop  →  task Done
+  →  DynastySystem Phase B emplaces DynastyMemberComponent on NPC.
+
+  Firing (dynasty-initiated): DynastySystem::Fire() removes DynastyMemberComponent
+  and updates the dynasty's member lists directly — no task needed.
+
+  Components:
+    DynastyComponent          — on the dynasty entity (name, gold, maxMembers, member/workshop lists).
+    DynastyMemberComponent    — on character entities; absent = independent NPC.
+    DynastyWorkshopComponent  — on workshop entities; absent = independent workshop.
+    DynastyInitComponent      — tag; triggers handle resolution pass in DynastySystem Phase A.

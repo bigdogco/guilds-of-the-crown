@@ -14,9 +14,14 @@
         { label: 'Economic Loop',     href: 'design/guild_economic_loop.html' },
         { label: 'Economic Diagrams', href: 'design/guild_economic_loop_detailed.html' },
         { label: 'Time Model',        href: 'design/guild_time_model.html' },
-        { label: 'AI Design',         href: 'design/guild_ai_design.html' },
-         { label: 'UI Kit',            href: 'design/guild_ui_kit.html' },
-      ]
+        { label: 'AI Design',                  href: 'design/guild_ai_design.html' },
+          { label: 'UI Kit',                   href: 'design/guild_ui_kit.html' },
+          { label: 'System Priorities',        href: 'design/guild_task_system_priority.html' },
+          { label: 'Task System',              href: 'design/guild_task_system.html' },
+          { label: 'Noticeboard System',       href: 'design/guild_task_noticeboard_system.html' },
+          { label: 'Selling Flow',             href: 'design/guild_task_selling.html' },
+          { label: 'Crafting Flow',            href: 'design/guild_task_crafting.html' },
+        ]
     },
   ];
   // ──────────────────────────────────────────────────────────────────────────

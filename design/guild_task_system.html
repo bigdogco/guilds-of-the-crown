@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guild — Task System Design</title>
+  <link rel="stylesheet" href="../assets/theme.css" />
+  <link rel="stylesheet" href="../assets/nav.css" />
+  <style>
+    body { font-family: sans-serif; background: var(--bg); margin: 0; padding: 48px 16px; color: var(--text); line-height: 1.65; }
+    .page { max-width: 960px; margin: 0 auto; }
+    h1 { font-size: 22px; font-weight: 500; color: var(--text); margin: 0 0 6px 0; }
+    h2 { font-size: 18px; font-weight: 500; color: var(--text); margin: 28px 0 6px 0; scroll-margin-top: 24px; }
+    h3 { font-size: 15px; font-weight: 500; color: var(--text); margin: 20px 0 8px 0; }
+    p { font-size: 13px; color: var(--text); margin: 0 0 10px 0; }
+    .subtitle { font-size: 13px; color: var(--muted); margin-bottom: 8px; }
+    .meta { font-size: 11px; color: var(--muted); letter-spacing: 0.05em; margin-bottom: 40px; }
+    .section { margin-bottom: 48px; }
+    .section-label { font-size: 10px; font-weight: 500; letter-spacing: 0.1em; color: var(--muted); text-transform: uppercase; margin-bottom: 6px; }
+    table { width: 100%; border-collapse: collapse; margin: 12px 0 20px 0; font-size: 13px; }
+    th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); color: var(--text); }
+    th { font-weight: 500; background: var(--panel); }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; background: rgba(0,0,0,0.1); padding: 1px 5px; border-radius: 3px; color: var(--text); }
+    pre { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 16px; overflow-x: auto; font-size: 12px; line-height: 1.55; color: var(--text); margin: 12px 0 16px 0; }
+    pre code { background: transparent; padding: 0; color: inherit; font-size: inherit; }
+    .callout { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 14px 18px; margin: 16px 0; }
+    .callout-purple { border-left: 3px solid #534AB7; border-radius: 0 8px 8px 0; }
+    .callout-teal { border-left: 3px solid #0F6E56; border-radius: 0 8px 8px 0; }
+    .callout-amber { border-left: 3px solid #854F0B; border-radius: 0 8px 8px 0; }
+    .callout-label { font-size: 10px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 4px; }
+    .callout-purple .callout-label { color: #534AB7; }
+    .callout-teal .callout-label { color: #0F6E56; }
+    .callout-amber .callout-label { color: #854F0B; }
+    ul, ol { font-size: 13px; color: var(--text); margin: 0 0 12px 0; padding-left: 22px; }
+    li { margin-bottom: 4px; }
+    .divider { border: none; border-top: 1px solid var(--border); margin: 48px 0; }
+  </style>
+</head>
+<body>
+<div id="content">
+<div class="page">
+
+  <h1>Task System — Design &amp; Implementation Notes</h1>
+  <p class="subtitle">Multi-step tasks, step executors, gather task (April 2026)</p>
+  <p class="meta">DESIGN NOTE · TASK SYSTEM v1</p>
+
+  <div class="callout callout-purple">
+    <div class="callout-label">May 2026 Update</div>
+    <p>This document captures the original architecture. Extensions since: Hire task type, per-owner NoticeboardComponent, DeliverStep/PickupStep/SellStep, Craft task type, and tag-based step routing. When this doc and newer docs differ, the newer docs win.</p>
+  </div>
+
+  <div class="section">
+    <h2>1. Purpose</h2>
+    <p>Extend the task system from single-action (MoveTo only) to ordered multi-step sequences. The first real task type is a two-step Gather task:</p>
+    <ul>
+      <li><strong>Step 0</strong> — MoveToStep: walk to the gathering spot</li>
+      <li><strong>Step 1</strong> — GatherStep: accumulate items into inventory until target reached</li>
+    </ul>
+    <p>The architecture is designed so that adding future task types (Deliver, Build, Guard, etc.) only requires defining new step structs and a new step executor system — no changes to the claiming, noticeboard, or cleanup logic.</p>
+  </div>
+
+  <div class="section">
+    <h2>2. Architecture Overview</h2>
+    <h3>Producers → Noticeboard → Consumers</h3>
+    <p>TaskClaimSystem (test spawn, Phase A) → TaskNoticeboard (index on TilemapWorld) → TaskClaimSystem (claim + start, Phase B/C)</p>
+    <p>Future producers: CityAI, WorkshopSystem, NeedsSystem. Signals: on_construct&lt;TaskComponent&gt; → RegisterTask, on_destroy&lt;TaskComponent&gt; → UnregisterTask.</p>
+
+    <h3>Step Execution Flow (one tick, priority order left to right)</h3>
+    <pre><code>Priority 15              16                  17                  18                  20
++---------------+  +-----------+  +------------------+  +------------------+  +------------------+
+| TaskClaimSystem|  | Pathfind- |  | MoveToStepSystem |  | GatherStepSystem |  | TaskCleanup-     |
+| Phase A: spawn |  | ingSystem |  | Phase A: start   |  | Phase A: start   |  | System           |
+| Phase B: claim |  |           |  |   MoveGoal       |  |   (flag only)    |  | Phase A: destroy |
+| Phase C: start |  |           |  | Phase B: process |  | Phase B: accum.  |  |   Done/Failed    |
+|  InProgress    |  |           |  |   MoveResult,    |  | Phase C: check   |  | Phase B: remove  |
+|                |  |           |  |   advance step   |  |   completion     |  |   stale Current- |
++---------------+  +-----------+  +------------------+  +------------------+  +------------------+</code></pre>
+
+    <p>Task entity: <code>TaskComponent</code> + <code>TaskStepsComponent</code></p>
+  </div>
+
+  <div class="section">
+    <h2>3. Key Concepts</h2>
+
+    <h3>3.1 Task Entities</h3>
+    <p>A task is an entt entity with two components:</p>
+    <ul>
+      <li><code>TaskComponent</code> — shared metadata (id, type, state, claimedBy, timestamps)</li>
+      <li><code>TaskStepsComponent</code> — ordered step sequence + current step index + stepStarted flag</li>
+      <li><code>GameEntityComponent</code> — provides a StableId (PackedId) for logging/save</li>
+    </ul>
+    <p>Task entities have no TransformComponent or visual presence. They are pure data describing work to be done.</p>
+
+    <h3>3.2 Task States</h3>
+    <ul>
+      <li><strong>Posted</strong> — visible on the noticeboard, available for claiming</li>
+      <li><strong>Claimed</strong> — reserved by a character, not yet executing</li>
+      <li><strong>InProgress</strong> — character is actively working on the current step</li>
+      <li><strong>Done</strong> — all steps completed successfully (terminal)</li>
+      <li><strong>Failed</strong> — could not complete — path blocked, interrupted, cancelled (terminal)</li>
+    </ul>
+    <p>Terminal states are destroyed by TaskCleanupSystem every tick.</p>
+
+    <h3>3.3 TaskStepsComponent</h3>
+    <pre><code>struct TaskStepsComponent {
+    std::vector&lt;TaskStep&gt; steps;   // all steps, in order
+    int  currentStep  = 0;         // index into steps[]
+    bool stepStarted  = false;     // reset to false by Advance()
+};</code></pre>
+    <p>stepStarted is the handshake between phase transitions. Each step executor checks (!stepStarted) for first-tick setup. Advance() resets it to false so the next executor picks up on the same tick.</p>
+
+    <h3>3.4 Step Payload Types</h3>
+    <pre><code>MoveToStep   { destination: Spark::Point, arrivalRadius: float }
+GatherStep   { spot: entt::entity, itemType: StringId,
+               gatheringSpeed: int, targetQuantity: int,
+               gathered: int, accumulator: float }
+TaskStep  =  std::variant&lt;MoveToStep, GatherStep, DeliverStep,
+                          PickupStep, SellStep, CraftStep&gt;</code></pre>
+
+    <h3>3.5 Tag-Based Step Routing</h3>
+    <p>Each character entity carries exactly one zero-size tag component while a task is InProgress, identifying its current step type:</p>
+    <ul>
+      <li>MoveToStepActiveTag, GatherStepActiveTag, DeliverStepActiveTag</li>
+      <li>PickupStepActiveTag, SellStepActiveTag, CraftStepActiveTag</li>
+    </ul>
+    <p>Step systems pre-filter via EnTT view intersection: <code>reg.view&lt;CurrentTaskComponent, XxxStepActiveTag&gt;()</code></p>
+    <p>This is O(N_chars_in_that_step) rather than O(N_all_chars). Tags are NOT serialised — StepTagRebuildSystem (priority 13) rebuilds them on first tick after save load.</p>
+  </div>
+
+  <div class="section">
+    <h2>4. Task Lifecycle Diagram</h2>
+    <pre><code>Character idle
+    |
+    v
+[TaskClaimSystem Phase B]
+Noticeboard queried for Posted tasks.
+Nearest task claimed: task.state = Claimed,
+character gets CurrentTaskComponent.
+    |
+    v
+[TaskClaimSystem Phase C]
+task.state = InProgress
+    |
+    v
++----+--------------------------------------------------+
+|    Current step dispatch (same tick, every tick)      |
+|                                                       |
+|  MoveToStepSystem (priority 17)                       |
+|    if current step == MoveToStep && !stepStarted:     |
+|      emplace MoveGoalComponent -&gt; PathfindingSystem   |
+|      stepStarted = true                               |
+|    on MoveResult::Arrived:                            |
+|      HasMoreSteps? -&gt; Advance() -&gt; next step executor |
+|      else         -&gt; task.state = Done                |
+|    on Blocked/Cancelled:                              |
+|      task.state = Failed                              |
+|                                                       |
+|  GatherStepSystem (priority 18)                       |
+|    if current step == GatherStep && !stepStarted:     |
+|      stepStarted = true, log                          |
+|    each tick:                                         |
+|      accumulator += gatheringSpeed / 60               |
+|      while accumulator &gt;= 1: add item, gathered++     |
+|    if gathered &gt;= targetQuantity:                     |
+|      HasMoreSteps? -&gt; Advance() -&gt; next step executor |
+|      else         -&gt; task.state = Done                |
++-------------------------------------------------------+
+    |
+    v
+task.state == Done or Failed
+    |
+    v
+[TaskCleanupSystem Phase A]
+task entity destroyed -&gt; noticeboard auto-unregisters
+    |
+    v
+[TaskCleanupSystem Phase B]
+CurrentTaskComponent removed from character
+    |
+    v
+Character idle  (loop back to top)</code></pre>
+  </div>
+
+  <div class="section">
+    <h2>5. System Details</h2>
+
+    <h3>5.1 TaskClaimSystem (priority 15)</h3>
+    <p>Owns noticeboard signal registration (on_construct/on_destroy&lt;TaskComponent&gt;).</p>
+    <ul>
+      <li><strong>Phase A:</strong> Every SPAWN_INTERVAL_TICKS (600), spawns a task if fewer than MAX_ACTIVE_TASKS are alive. Currently always tries Gather if spots are available, falls back to MoveTo.</li>
+      <li><strong>Phase B:</strong> Idle characters query the noticeboard for Posted tasks. Each picks the nearest by world-space distance to the first step's destination.</li>
+      <li><strong>Phase C:</strong> Kept separate from Phase B so a task can go Posted → Claimed → InProgress in one tick.</li>
+    </ul>
+
+    <h3>5.2 MoveToStepSystem (priority 17)</h3>
+    <ul>
+      <li><strong>Phase A:</strong> Finds InProgress tasks where current step is MoveToStep and !stepStarted. Emplaces MoveGoalComponent, sets stepStarted = true.</li>
+      <li><strong>Phase B:</strong> Arrived → Advance() or task.state = Done. Blocked/Cancelled → task.state = Failed.</li>
+    </ul>
+
+    <h3>5.3 GatherStepSystem (priority 18)</h3>
+    <p>No signals needed. Each tick, marks stepStarted on first tick, adds gatheringSpeed / 60.0 to accumulator, converts whole values into inventory items. When gathered &ge; targetQuantity: Advance() or task.state = Done.</p>
+
+    <h3>5.4 TaskCleanupSystem (priority 20)</h3>
+    <ul>
+      <li><strong>Phase A:</strong> Collects and destroys Done/Failed entities. on_destroy fires automatically, removing from noticeboard.</li>
+      <li><strong>Phase B:</strong> Removes stale CurrentTaskComponent, making the character idle.</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>6. Failure Handling</h2>
+    <p>Failures are terminal — no per-step retry or fallback branch.</p>
+    <p><strong>Sources:</strong> MoveToStep path blocked, external interrupt from another system.</p>
+    <p><strong>On failure:</strong> task.state = Failed → TaskCleanupSystem destroys next tick → CurrentTaskComponent removed → character goes idle → picks new task next tick.</p>
+    <p>"Drop inventory and flee" is NOT part of the task system — lives in a future ThreatResponseSystem.</p>
+  </div>
+
+  <div class="section">
+    <h2>7. Adding a New Step Type</h2>
+    <ol>
+      <li>Define the step struct in <code>TaskComponents.h</code></li>
+      <li>Add it to the <code>TaskStep</code> variant and add STEP_TYPE constant + serialisation</li>
+      <li>Add a tag and wire it into <code>StepTags.h</code> (declare, add to RemoveActiveStepTag, add branch in ApplyStepTag, add to exclude list in StepTagRebuildSystem)</li>
+      <li>Create <code>MyStepSystem.h/.cpp</code> — inherit IEntitySystem, priority &gt; 18</li>
+      <li>Register in <code>GoCApp::Init()</code></li>
+      <li>Add the new .cpp/.h to <code>goc.vcxproj</code></li>
+    </ol>
+    <p>No changes needed to TaskClaimSystem, TaskCleanupSystem, or TaskNoticeboard — they are fully step-type agnostic.</p>
+  </div>
+
+  <div class="section">
+    <h2>8. File Inventory</h2>
+    <h3>Modified</h3>
+    <ul>
+      <li>Esc/Components/TaskComponents.h — Added TaskType::Gather; replaced MoveToTaskComponent with MoveToStep, GatherStep, TaskStep variant, TaskStepsComponent</li>
+      <li>GoCApp.cpp — Replaced MoveToTaskSystem with per-step systems; added StepTagRebuildSystem</li>
+      <li>Esc/Systems/TaskNoticeboard.h — Updated signal ownership comment</li>
+      <li>goc.vcxproj — Added new systems, removed old one</li>
+    </ul>
+    <h3>New (original multi-step task work)</h3>
+    <ul>
+      <li>Esc/Systems/TaskClaimSystem.h/.cpp — Priority 15</li>
+      <li>Esc/Systems/MoveToStepSystem.h/.cpp — Priority 17</li>
+      <li>Esc/Systems/GatherStepSystem.h/.cpp — Priority 18</li>
+      <li>Esc/Systems/TaskCleanupSystem.h/.cpp — Priority 20</li>
+    </ul>
+    <h3>New (tag-based step routing, May 2026)</h3>
+    <ul>
+      <li>Esc/Components/StepTags.h — Six ActiveTag structs, RemoveActiveStepTag(), ApplyStepTag()</li>
+      <li>Esc/Systems/StepTagRebuildSystem.h/.cpp — Priority 13</li>
+    </ul>
+    <h3>Removed</h3>
+    <ul>
+      <li>Esc/Systems/MoveToTaskSystem.h/.cpp — Replaced by focused per-step systems</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>9. StableId Usage</h2>
+    <ul>
+      <li>Task.id — PackedId via GameEntityComponent; used in all log output, survives save/load</li>
+      <li>Task.claimedBy — entt::entity, runtime-only, rebuilt on claim</li>
+      <li>Task.postedBy — entt::entity, runtime-only for now</li>
+      <li>GatherStep.spot — entt::entity, runtime-only reference to gathering spot</li>
+      <li>CurrentTask.task — entt::entity, runtime-only</li>
+      <li>Noticeboard index — entt::entity handles, rebuilt from registry on load</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>10. What Is Not Built Yet</h2>
+    <ul>
+      <li>TaskStepsComponent serialisation (variant + entity refs need custom operators)</li>
+      <li>Scoped noticeboards (per-workshop, per-region, personal needs)</li>
+      <li>Utility scoring for task selection (trait/skill modifiers, weights)</li>
+      <li>Task timeouts or reservation expiry</li>
+      <li>Inventory capacity limit for "fill inventory" completion condition</li>
+      <li>Team tasks (multi-NPC coordination on a single task)</li>
+      <li>UI for decision logs (console logging via "esc.task" channel only)</li>
+      <li>Real task producers (CityAI, NeedsSystem) — WorkshopSystems already posts</li>
+      <li>Interrupt handling via external systems (CombatSystem, ThreatSystem)</li>
+      <li>PickupStep GameEntity source path (sourceGameId branch) needs a real producer</li>
+    </ul>
+  </div>
+
+  <div class="section">
+    <h2>11. How to Test</h2>
+    <ol>
+      <li>Build and run with the test world loaded.</li>
+      <li>The world must have at least one BerryGatheringSpotComponent or WoodGatheringSpotComponent entity for Gather tasks to spawn.</li>
+      <li>Characters with CharacterComponent + PathfindingComponent + TransformComponent + InventoryComponent will automatically pick up tasks.</li>
+      <li>Watch console logs (channel "esc.task") for the task lifecycle.</li>
+      <li>Verify that after a Gather task completes, the character's InventoryComponent contains the expected itemType and quantity.</li>
+      <li>Verify that failed tasks are cleaned up and characters go idle and pick a new task.</li>
+    </ol>
+  </div>
+
+</div>
+</div>
+<script src="../assets/nav.js"></script>
+</body>
+</html>
